@@ -1,0 +1,1264 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dalaba House</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground: #12140f;
+    --glass: rgba(20, 22, 18, 0.66);
+    --glass-strong: rgba(20, 22, 18, 0.82);
+    --line: rgba(243, 238, 228, 0.16);
+    --paper: #f3eee4;
+    --muted: #b9b2a4;
+    --accent: #d7a24a;          /* bronze, after the main door */
+    --accent-ink: #1b1508;
+    color-scheme: dark;
+    font-family: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { background: var(--ground); color: var(--paper); overflow: hidden;
+         -webkit-user-select: none; user-select: none; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .hud { position: fixed; left: 0; right: 0; pointer-events: none;
+         padding-inline: 16px; display: flex; justify-content: space-between;
+         align-items: flex-start; gap: 12px; }
+  .hud > * { pointer-events: auto; }
+  .top { top: 0; padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
+  .bottom { bottom: 0; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+            flex-direction: column; align-items: stretch; }
+
+  .where { background: var(--glass); backdrop-filter: blur(10px);
+           -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line);
+           border-radius: 12px; padding: 8px 12px 9px; min-width: 0; }
+  .where .name { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+                 color: var(--muted); font-weight: 600; }
+  .where .room { font-size: 18px; font-weight: 700; line-height: 1.2;
+                 text-wrap: balance; }
+  .where .meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  .seg { display: flex; background: var(--glass); backdrop-filter: blur(10px);
+         -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line);
+         border-radius: 999px; padding: 3px; }
+  .seg button { font: inherit; font-size: 14px; font-weight: 600; color: var(--paper);
+                background: transparent; border: 0; border-radius: 999px;
+                padding: 7px 14px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .seg button:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .compass { width: 46px; height: 46px; border-radius: 50%; background: var(--glass);
+             border: 1px solid var(--line); position: relative;
+             backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .compass .needle { position: absolute; inset: 0; transition: transform 60ms linear; }
+  .compass .n { position: absolute; top: 3px; left: 50%; transform: translateX(-50%);
+                font-size: 11px; font-weight: 700; color: var(--accent); }
+  .compass .tick { position: absolute; top: 17px; left: 50%; width: 2px; height: 12px;
+                   margin-left: -1px; background: var(--paper); border-radius: 1px; }
+
+  .controls-row { display: flex; align-items: flex-end; justify-content: space-between;
+                  gap: 12px; margin-bottom: 10px; }
+  .joy { width: 116px; height: 116px; border-radius: 50%; position: relative;
+         background: var(--glass); border: 1px solid var(--line); touch-action: none;
+         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); flex: none; }
+  .joy .knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px;
+               margin: -24px 0 0 -24px; border-radius: 50%; background: var(--paper);
+               opacity: 0.9; box-shadow: 0 2px 10px rgba(0,0,0,0.35); }
+  .hint { font-size: 13px; color: var(--paper); background: var(--glass);
+          border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px;
+          max-width: 60%; line-height: 1.35; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+           padding-bottom: 2px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--paper);
+          background: var(--glass-strong); border: 1px solid var(--line);
+          border-radius: 999px; padding: 9px 14px; cursor: pointer; }
+  .chip[aria-current="true"] { border-color: var(--accent); color: var(--accent); }
+  .chip.photo { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  /* the 360 photo button: big, with an icon, a shadow and a pulsing ring
+     (until it has been used once) so it reads as something to tap */
+  .photo-btn { display: inline-flex; align-items: center; gap: 8px; position: relative;
+               font-size: 15px; font-weight: 700; padding: 11px 16px 11px 13px;
+               box-shadow: 0 4px 16px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.18) inset;
+               transition: transform 90ms ease; }
+  .photo-btn svg { width: 22px; height: 22px; flex: none; }
+  .photo-btn:active { transform: scale(0.95); }
+  .photo-btn.pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 999px;
+               border: 2px solid var(--accent); animation: ring 2.2s ease-out infinite;
+               pointer-events: none; }
+  @keyframes ring { 0% { opacity: 0.9; transform: scale(1); }
+                    70%, 100% { opacity: 0; transform: scale(1.18); } }
+  @media (prefers-reduced-motion: reduce) { .photo-btn.pulse::after { animation: none; opacity: 0.6; } }
+
+  #loading { position: fixed; inset: 0; display: grid; place-items: center;
+             background: var(--ground); z-index: 5; text-align: center; padding-inline: 24px; }
+  #loading .t { font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
+  #loading .s { color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .bar { width: min(260px, 70vw); height: 4px; background: var(--line); border-radius: 2px;
+         margin: 14px auto 0; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .compass .needle { transition: none; } }
+/* ?shot=...: fixed camera for render comparisons, no HUD */
+body.shot .hud, body.shot #loading { display: none !important; }
+</style>
+
+<div id="stage"></div>
+
+<div id="loading" role="status">
+  <div>
+    <div class="t">Dalaba House</div>
+    <div class="s" id="loadText">Loading the model…</div>
+    <div class="bar"><i id="loadBar"></i></div>
+  </div>
+</div>
+
+<div class="hud top">
+  <div class="where" aria-live="polite">
+    <div class="name">Dalaba House</div>
+    <div class="room" id="roomName">Front yard</div>
+    <div class="meta" id="roomMeta">Facing east · 3.1 m ceilings</div>
+  </div>
+  <div class="right">
+    <div class="seg" role="group" aria-label="View">
+      <button id="modeWalk" aria-pressed="true">Walk</button>
+      <button id="modeOver" aria-pressed="false">Overview</button>
+    </div>
+    <button class="chip" id="roofBtn" aria-pressed="false" hidden>Roof: off</button>
+    <button class="chip photo photo-btn pulse" id="photoBtn" hidden
+            aria-label="Open the 360° photo of this room">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <ellipse cx="12" cy="12" rx="10" ry="4.2"/>
+        <path d="M12 2.5a9.5 9.5 0 0 1 0 19"/><path d="M15.2 19.6l-3.2 1.9 1.7 3"/>
+      </svg><span id="photoLabel">360° photo</span></button>
+    <button class="chip" id="bakeBtn" aria-pressed="true" hidden>Baked light: on</button>
+    <div class="compass" aria-hidden="true">
+      <div class="needle" id="needle"><span class="n">N</span><span class="tick"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="hud bottom">
+  <div class="controls-row">
+    <div class="joy" id="joy" aria-label="Walk joystick"><div class="knob" id="knob"></div></div>
+    <div class="hint" id="hint">Drag anywhere to look around. Use the stick (or W A S D) to walk. Closed doors let you pass through.</div>
+  </div>
+  <nav class="chips" id="chips" aria-label="Go to room"></nav>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+// Wall footprints [x0, y0, x1, y1] in plan metres (+x east, +y north),
+// exported from the Blender model: only pieces you would bump into.
+const SITE = {"walls":[[-0.192,1.598,0.1,1.78],[0.9,1.598,3.291,1.78],[18.915,-1.357,19.115,1.143],[16.415,0.943,16.695,1.143],[17.495,0.943,18.915,1.143],[16.415,-1.557,19.115,-1.357],[16.415,-1.357,16.615,-0.107],[16.415,-0.107,16.615,0.493],[16.415,0.493,16.615,0.943],[8.109,-0.192,8.291,2.928],[8.109,3.783,8.291,3.797],[8.111,9.005,9.185,9.187],[8.109,3.783,8.291,4.553],[8.109,6.037,8.291,7.143],[8.109,8.655,8.291,9.185],[9.005,3.783,9.187,9.185],[11.61,-0.192,11.792,4.197],[11.61,4.197,11.792,5.097],[11.61,5.097,11.792,5.497],[11.61,6.397,11.792,10.397],[11.61,10.397,11.792,11.297],[11.61,11.297,11.792,11.678],[0.606,11.498,1.009,11.68],[1.009,11.498,1.909,11.68],[1.909,11.498,2.509,11.68],[2.509,11.498,3.409,11.68],[3.409,11.498,4.009,11.68],[4.009,11.498,4.909,11.68],[4.909,11.498,5.509,11.68],[5.509,11.498,6.409,11.68],[6.409,11.498,9.109,11.68],[9.109,11.498,11.409,11.68],[11.409,11.498,11.79,11.68],[-4.183,5.001,5.785,5.183],[6.513,5.001,6.791,5.183],[-4.183,-0.194,-3.094,-0.012],[-1.094,-0.194,1.306,-0.012],[1.306,-0.194,2.206,-0.012],[2.206,-0.194,3.806,-0.012],[3.806,-0.194,6.106,-0.012],[6.106,-0.194,7.006,-0.012],[7.006,-0.194,7.906,-0.012],[7.906,-0.194,8.806,-0.012],[8.806,-0.194,11.106,-0.012],[11.106,-0.194,11.79,-0.012],[-4.185,-0.192,-4.003,3.997],[-4.185,3.997,-4.003,4.597],[-4.185,4.597,-4.003,5.181],[0.604,5.003,0.786,6.779],[0.604,8.81,0.786,11.678],[18.915,1.143,19.115,1.57],[18.915,2.07,19.115,4.947],[18.915,6.947,19.115,9.82],[18.915,10.32,19.115,13.193],[13.227,13.243,15.796,13.443],[16.296,13.243,18.865,13.443],[-5.635,13.243,-3.592,13.443],[-3.092,13.243,-1.05,13.443],[0.95,13.243,3.519,13.443],[4.019,13.243,6.588,13.443],[7.088,13.243,9.658,13.443],[10.158,13.243,12.727,13.443],[-6.035,-1.807,-5.685,-1.307],[0.45,13.243,0.95,13.593],[3.519,13.243,4.019,13.593],[6.588,13.243,7.088,13.593],[9.658,13.243,10.158,13.593],[12.727,13.243,13.227,13.593],[15.796,13.243,16.296,13.593],[18.865,13.243,19.365,13.593],[18.915,1.57,19.265,2.07],[18.915,4.947,19.265,5.447],[-6.035,0.502,-5.685,1.002],[18.915,6.447,19.265,6.947],[18.915,9.82,19.265,10.32],[18.915,13.193,19.265,13.693],[-6.035,2.811,-5.685,3.311],[-6.035,5.12,-5.685,5.62],[-6.035,11.12,-5.685,11.62],[-6.035,13.193,-5.685,13.693],[-6.135,13.243,-5.635,13.593],[-3.592,13.243,-3.092,13.593],[-1.05,13.243,-0.55,13.593],[-5.885,-1.557,16.415,-1.357],[-5.885,-1.307,-5.685,0.502],[-5.885,1.002,-5.685,2.811],[-5.885,3.311,-5.685,5.12],[-5.885,11.62,-5.685,13.193],[18.715,10.743,18.915,13.043],[15.915,13.043,18.915,13.243],[15.915,10.743,17.115,10.943],[17.115,10.743,17.715,10.943],[17.715,10.743,18.715,10.943],[15.915,10.943,16.115,11.05],[15.915,11.95,16.115,12.15],[15.915,12.15,16.115,12.75],[15.915,12.75,16.115,13.043],[-0.192,3.797,0.1,3.979],[0.9,3.797,6.793,3.979],[8.109,3.797,11.79,3.979],[8.111,6.597,10.043,6.779],[10.757,6.597,11.79,6.779],[3.11,3.979,3.293,4.03],[3.11,4.93,3.293,5.001],[-0.194,-0.192,-0.012,3.977],[3.11,-0.192,3.293,0.288],[3.11,0.288,3.293,1.312],[3.11,1.312,3.293,3.977],[4.105,5.003,4.287,6.777],[6.611,5.003,6.793,6.777],[4.107,6.597,6.791,6.779],[-4.493,-0.936,-4.185,-0.195],[6.611,-0.192,6.793,2.844],[6.613,2.606,6.793,2.788],[7.521,2.606,8.289,2.788],[0.606,8.809,0.996,8.991],[1.71,8.809,2.296,8.991],[2.116,7.969,2.298,11.678],[2.116,5.003,2.298,5.673],[2.116,6.597,2.298,6.777],[0.606,6.597,1.009,6.779],[1.009,6.597,1.909,6.779],[1.909,6.597,2.296,6.779]],"stair":{"xe":11.791888319999998,"w":0.9,"rise":0.16956521739130434,"going":0.31273527466666656,"n_low":7,"n_up":16,"half_y0":-0.1940291199999986,"up_y0":0.8059708800000014,"head_y0":5.497,"head_y1":6.397,"roof_z":3.5,"head_z0":3.102,"base_z":-0.4},"roof":[[0.45409855999999926,-0.9440291199999987,11.641888319999998,11.8298704],[0.45409855999999926,6.547000000000001,11.941888319999999,11.8298704],[-4.334667519999996,-0.9440291199999987,0.6040985599999993,5.332831040000001],[11.391888319999998,5.547,12.691888319999999,6.397]],"ground_z":-0.4,"footprint":[[0.6040985599999993,-0.1940291199999986,11.791888319999998,11.6798704],[-4.184667519999997,-0.1940291199999986,0.6040985599999993,5.182831040000002]],"plot":[-5.885,-1.5570000000000002,19.115000000000002,13.443],"light":{"sun_az":3.9793506945470716,"sun_el":0.6108652381980153,"sun":[17.7991,14.876,11.0329],"sky":"sky.webp","sky_intensity":2.76078,"probe":"probe.webp","probe_intensity":5.54889,"vlight":{"LMV_INT":{"intensity":0.23734,"encoding":"knee","interior":true},"LMV_CARS":{"intensity":0.61923,"encoding":"knee"},"LMV_PLANTS":{"intensity":0.61923,"encoding":"knee"}},"fog":[0.8644,0.8637,0.8561],"open_up":[0.9878,1.2812,1.8946],"open_down":[1.2342,1.0119,0.6973],"house_box":[-4.185,-0.194,11.792,11.68],"house_rects":[[0.604,-0.194,11.792,11.68],[-4.185,-0.194,0.604,5.183],[15.915,10.743,18.915,13.243],[16.415,-1.557,19.115,1.143]],"look":[0.0,0.0,0.0,0.0,0.0,0.0,5e-05,0.00021,0.00055,0.00119,0.00223,0.00383,0.00626,0.00977,0.01483,0.022,0.03214,0.04601,0.06223,0.0807,0.10182,0.12607,0.15396,0.18608,0.2231,0.26567,0.31431,0.3693,0.43041,0.49438,0.55604,0.61346,0.666,0.71354,0.75631,0.79464,0.82889,0.85948,0.88682,0.9113,0.93323,0.95293,0.97066,0.98662,1.0,1.0,1.0,1.0],"look_range":[-12.47393,4.026069],"room_ev":{"default":2.4},"roof_ev":-2.2,"indoor_fill":[0.183,0.22565,0.30337],"sky_phone":"sky_phone.webp","probe_phone":"probe_phone.webp"},"tex":{"F_Boucle_Brown":{"file":"f_boucle_brown.png","mean":[0.4393,0.2825,0.1884],"px":256},"F_Chenille_Blue":{"file":"f_chenille_blue.png","mean":[0.3453,0.4473,0.5963],"px":256},"F_Fabric_Cream":{"file":"f_fabric_cream.png","mean":[0.8863,0.8589,0.8079],"px":256},"F_Fabric_DustyBlue":{"file":"f_fabric_dustyblue.png","mean":[0.251,0.3608,0.5177],"px":256},"F_Leather_Brown":{"file":"f_leather_brown.png","mean":[0.3843,0.2431,0.1569],"px":256},"F_Quartz_White_Speckled":{"file":"f_quartz_white_speckled.png","mean":[0.9395,0.9355,0.9238],"px":256},"F_Rug_Hall_Runner":{"file":"f_rug_hall_runner.jpg","mean":[0.6412,0.6492,0.6803],"px":962,"file_phone":"f_rug_hall_runner_phone.jpg"},"F_Rug_Living_Rug":{"file":"f_rug_living_rug.jpg","mean":[0.6685,0.6702,0.6926],"px":813,"file_phone":"f_rug_living_rug_phone.jpg"},"F_Rug_MB_Rug":{"file":"f_rug_mb_rug.jpg","mean":[0.7202,0.7179,0.6941],"px":1024,"file_phone":"f_rug_mb_rug_phone.jpg"},"F_Rug_Oatmeal":{"file":"f_rug_oatmeal.png","mean":[0.8078,0.7764,0.7215],"px":256},"F_Tile_Subway_White":{"file":"tile_subway.png","mean":[0.9585,0.9583,0.9487],"normal":"tile_subway_n.png","px":256},"F_Walnut_Fluted":{"file":"walnut.jpg","mean":[0.5072,0.3253,0.202],"normal":"walnut_n.png","px":1024,"file_phone":"walnut_phone.jpg"},"F_Walnut_Medium":{"file":"tile_f_walnut_medium.jpg","mean":[0.5276,0.3577,0.241],"normal":"tile_f_walnut_medium_n.png","px":512},"F_Walnut_Medium_V":{"file":"tile_f_walnut_medium_v.jpg","mean":[0.5276,0.3577,0.241],"normal":"tile_f_walnut_medium_v_n.png","px":512},"F_Walnut_Table":{"file":"tile_f_walnut_table.jpg","mean":[0.4989,0.3187,0.1976],"normal":"tile_f_walnut_table_n.png","px":512},"House_Parapet_White":{"file":"house_parapet_white.png","mean":[0.9411,0.9333,0.9176],"px":256},"House_Render_Grafiato":{"file":"tile_render_grafiato.jpg","mean":[0.8742,0.8703,0.8534],"normal":"tile_render_grafiato_n.png","px":512},"S_Fence_Cap":{"file":"s_fence_cap.png","mean":[0.8001,0.6981,0.5491],"normal":"s_fence_cap_n.png","px":256},"S_Fence_Render_Sand":{"file":"s_fence_render_sand.png","mean":[0.8313,0.7293,0.5803],"normal":"s_fence_render_sand_n.png","px":256},"S_Pavers_Charcoal":{"file":"pavers.jpg","mean":[0.2106,0.2067,0.1989],"normal":"pavers_n.png","px":1024,"file_phone":"pavers_phone.jpg"},"Tile_Floor_1200x600":{"file":"tile_floor.png","mean":[0.5427,0.5271,0.4997],"normal":"tile_floor_n.png","px":512},"Tile_Wall_600x1200":{"file":"tile_wall.png","mean":[0.5899,0.5742,0.5469],"normal":"tile_wall_n.png","px":512},"House_Stone_Facade":{"file":"d_stone_facade.jpg","normal":"dn_stone_facade.jpg","file_phone":"d_stone_facade_half_phone.jpg","mean":[0.5378,0.4822,0.4096]}},"lightmaps":{"LM_EXT":{"file":"lm_ext.webp","file_phone":"lm_ext_half_phone.webp","intensity":0.61923,"sun":true,"encoding":"knee"},"LM_EXT_CEIL":{"file":"lm_ext.webp","file_phone":"lm_ext_half_phone.webp","intensity":0.61923,"sun":true,"encoding":"knee"},"LM_INT":{"file":"lm_int.webp","file_phone":"lm_int_half.webp","intensity":0.23734,"sun":true,"encoding":"knee","interior":true},"LM_INT_CEIL":{"file":"lm_int.webp","file_phone":"lm_int_half.webp","intensity":0.23734,"sun":true,"encoding":"knee","interior":true}},"panos":[{"name":"Living","file":"pano_living.jpg","x":5.2,"y":7.6,"floor":0.0},{"name":"Nook","file":"pano_nook.jpg","x":3.2,"y":7.2,"floor":0.0},{"name":"Dining","file":"pano_dining.jpg","x":9.2,"y":10.0,"floor":0.0},{"name":"Kitchen","file":"pano_kitchen.jpg","x":10.4,"y":7.6,"floor":0.0},{"name":"MasterBed","file":"pano_masterbed.jpg","x":-0.95,"y":3.6,"floor":0.0},{"name":"MasterBath","file":"pano_masterbath.jpg","x":1.2,"y":0.9,"floor":0.0},{"name":"WalkIn","file":"pano_walkin.jpg","x":1.55,"y":2.8,"floor":0.0},{"name":"Bedroom2","file":"pano_bedroom2.jpg","x":9.0,"y":2.9,"floor":0.0},{"name":"Office","file":"pano_office.jpg","x":3.8,"y":2.4,"floor":0.0},{"name":"Hall","file":"pano_hall.jpg","x":3.9,"y":4.5,"floor":0.0},{"name":"GuestToilet","file":"pano_guesttoilet.jpg","x":7.2,"y":1.75,"floor":0.0},{"name":"Lobby","file":"pano_lobby.jpg","x":7.45,"y":3.3,"floor":0.0},{"name":"DirtyKitchen","file":"pano_dirtykitchen.jpg","x":10.4,"y":5.3,"floor":0.0},{"name":"Store","file":"pano_store.jpg","x":5.45,"y":5.9,"floor":0.0},{"name":"WC","file":"pano_wc.jpg","x":1.45,"y":5.9,"floor":0.0},{"name":"Utility","file":"pano_utility.jpg","x":1.45,"y":10.2,"floor":0.0},{"name":"Corridor","file":"pano_corridor.jpg","x":7.35,"y":5.9,"floor":0.0},{"name":"Porch","file":"pano_porch.jpg","x":1.3,"y":7.8,"floor":0.0},{"name":"Driveway","file":"pano_driveway.jpg","x":-2.8,"y":12.2,"floor":-0.4},{"name":"NorthPath","file":"pano_northpath.jpg","x":1.4,"y":12.55,"floor":-0.4},{"name":"EastYard","file":"pano_eastyard.jpg","x":15.5,"y":6.0,"floor":-0.4},{"name":"Roof","file":"pano_roof.jpg","x":6.0,"y":6.0,"floor":3.5},{"name":"GuardHouse","file":"pano_guardhouse.jpg","x":17.3,"y":11.45,"floor":-0.3},{"name":"Bathhouse","file":"pano_bathhouse.jpg","x":17.45,"y":-0.2,"floor":-0.3}]};
+const WALLS = SITE.walls;
+
+// Plan metres -> three.js (Y up): (x, y) -> (x, -y)
+const EYE = 1.6, RADIUS = 0.22, SPEED = 1.5;
+// ?shot=x,y,z,yaw,pitch,vfov[,shiftY[,near]]: pin the camera to a Cycles
+// camera (plan metres, radians, degrees; shiftY as Blender's lens shift,
+// near = its clip start) and hide
+// the HUD, for side-by-side comparisons with the renders
+// (scripts/wt_compare.py).  window.DALABA_READY turns true once the model
+// and every texture are in.
+const SHOT = new URLSearchParams(location.search).get("shot")?.split(",").map(Number) || null;
+if (SHOT) document.body.classList.add("shot");
+// (scene exposed for inspection in shot mode only)
+
+// Roof stair on the east wall (see build_house.py): dog-leg, 19 risers up
+// to the 3.4 m roof.  Lower flight (outer column) rises south to a half
+// landing at 4 risers; the upper flight (against the wall) rises north to
+// the stair head at the parapet gap.
+const ST = SITE.stair;
+const ROOF_Z = ST.roof_z, XE = ST.xe, STAIR_W = ST.w, RISE = ST.rise,
+      GOING = ST.going, LAND_Y0 = ST.head_y0, LAND_Y1 = ST.head_y1,
+      N_LOW = ST.n_low, N_UP = ST.n_up, Y_UP0 = ST.up_y0, HALF_Y0 = ST.half_y0,
+      BASE_Z = ST.base_z || 0, GROUND_Z = SITE.ground_z || 0,
+      FOOT = SITE.footprint || [], PLOT = SITE.plot;
+// walkable roof inside the parapets (plan metres), plus the stair head gap
+const ROOF_AREAS = SITE.roof;
+
+const ROOMS = [
+  ["Master bathroom", 0, 0, 3.1, 1.59], ["Walk-in closet", 0, 1.78, 3.11, 3.8],
+  ["Master bedroom", -4.0, 0, -0.19, 5.0], ["Office / guest", 3.29, 0, 6.61, 3.8],
+  ["Guest toilet", 6.79, 0, 8.11, 2.61], ["Lobby", 6.79, 2.79, 8.11, 3.8],
+  ["Bedroom 2", 8.29, 0, 11.61, 3.8], ["Hall", -0.19, 3.98, 8.11, 5.0],
+  ["Laundry", 8.29, 3.98, 9.0, 6.6], ["Dirty kitchen + pantry", 9.19, 3.98, 11.61, 6.6],
+  ["Kitchen", 9.19, 6.78, 11.61, 9.0], ["Closet", 8.29, 6.78, 9.0, 9.0],
+  ["Dining", 8.1, 9.0, 11.61, 11.5], ["Store", 4.29, 5.18, 6.61, 6.6],
+  ["W/C", 0.79, 5.18, 2.12, 6.6], ["Utility", 0.79, 8.99, 2.12, 11.5],
+  ["Porch", 0.6, 6.78, 2.12, 8.81], ["Foyer", 2.3, 5.18, 4.29, 6.78],
+  ["Corridor", 6.61, 5.0, 8.11, 6.78], ["Living room", 2.3, 6.78, 8.11, 11.5],
+  ["Guard house", 16.115, 10.943, 18.715, 13.043],
+  ["Outdoor bathroom", 16.615, -1.357, 18.915, 0.943],
+];
+// jump points: label, from (x, y), look toward (x, y)
+const STOPS = [
+  ["Street", [-13.0, 5.2], [-5.9, 7.4]],
+  ["Porch", [-0.05, 12.7], [-0.05, 7.8]],
+  ["Living", [7.6, 7.3], [3.5, 10.5]],
+  ["Entry nook", [3.2, 7.4], [3.2, 5.2]],
+  ["Dining", [8.4, 9.6], [11.0, 10.6]],
+  ["Kitchen", [10.4, 7.0], [10.4, 9.5]],
+  ["Master bed", [-1.0, 3.3], [-4.0, 2.1]],
+  ["Master bath", [0.35, 1.1], [3.1, 0.8]],
+  ["Walk-in", [0.3, 2.8], [3.1, 2.8]],
+  ["Bedroom 2", [8.7, 1.9], [11.6, 1.9]],
+  ["Office", [6.1, 2.2], [3.6, 1.1]],
+  ["Hall", [0.4, 4.5], [7.5, 4.5]],
+  ["Guest WC", [7.45, 2.4], [7.45, 0.6]],
+  ["Corridor", [7.35, 6.4], [7.35, 3.4]],
+  ["Dirty kitchen", [10.4, 4.4], [10.4, 6.4]],
+  ["Store", [5.45, 5.5], [5.45, 6.5]],
+  ["W/C", [1.45, 6.3], [1.45, 5.3]],
+  ["Utility", [1.45, 9.4], [1.45, 11.2]],
+  ["Driveway", [-2.5, 8.5], [0.6, 8.0]],
+  ["East yard", [15.5, 6.0], [11.8, 6.0]],
+  ["Guard house", [16.6, 12.45], [18.5, 11.3]],
+  ["Outdoor bath", [17.1, 0.4], [18.4, -0.9]],
+  ["Roof stairs", [13.15, 2.0], [13.15, -1.0]],
+  ["Roof", [6.0, 8.5], [2.0, 2.0], "roof"],
+];
+
+const stage = document.getElementById("stage");
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: !(navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches) });
+} catch (e) {
+  // Chrome turns WebGL off for a site after it runs out of graphics memory
+  document.getElementById("loadText").textContent =
+    "3D is switched off in this browser right now (it can happen after the phone ran out of memory). Close the browser completely, open it again and reload this page.";
+  document.getElementById("loadBar").parentElement.hidden = true;
+  throw e;
+}
+// Phones get a lighter path: no post-processing chain (its full-screen
+// half-float buffers, 4x MSAA copies and AO targets ran iPhones out of GPU
+// memory), a smaller shadow map, lower pixel ratio, one 360 photo in memory.
+const PHONE = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PHONE ? 1.5 : 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+// AgX, the renders' view transform, with Blender's "Medium High Contrast"
+// look (contrast 1.2 about mid grey in AgX's log space); exposure as the
+// room renders (-0.2 EV)
+// The baked exports carry Blender's own grey curve for the renders' view
+// transform and look (AgX + Punchy, measured by scripts/bake_exterior.py):
+// it replaces three's AgX sigmoid, so greys and contrast match the renders.
+// "lite": a phone that lost its 3-D context with the baked extras reloads
+// without them (the plain lighting that always fitted); ?lite=0 / ?lite=1
+const LITE_KEY = "dalaba_lite_1793817059";     // per build: a new publish tries the full version again
+const LITE_Q = new URLSearchParams(location.search).get("lite");
+if (LITE_Q === "0") localStorage.removeItem(LITE_KEY);
+const LITE = LITE_Q === "1" || (LITE_Q !== "0" && localStorage.getItem(LITE_KEY) === "1");
+const LIGHT = LITE ? null : (SITE.light || null);
+if (LIGHT && LIGHT.look) {
+  // display value -> the sigmoid's output (three then applies ^2.2 and the
+  // outset matrix), sampled on AgX's log range
+  const eotf = (v) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const ys = LIGHT.look.map((d) => Math.pow(eotf(d), 1 / 2.2));
+  const n = ys.length;
+  // piecewise linear as a sum of hinges (GLSL 1 has no const arrays and the
+  // output pass is GLSL 1): f(x) = y0 + sum_i (s_i - s_i-1) max(x - i, 0)
+  let terms = "", prev = 0;
+  for (let i = 0; i < n - 1; i++) {
+    const sl = ys[i + 1] - ys[i];
+    terms += `\n  r += ${(sl - prev).toFixed(7)} * max( x - ${i}.0, 0.0 );`;
+    prev = sl;
+  }
+  THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment
+    .replace("vec3 AgXToneMapping(",
+      `vec3 rLook( vec3 u ) {
+  vec3 x = clamp( u, 0.0, 1.0 ) * ${n - 1}.0;
+  vec3 r = vec3( ${ys[0].toFixed(7)} );${terms}
+  return r;
+}
+vec3 AgXToneMapping(`)
+    .replace("color = agxDefaultContrastApprox( color );",
+             "color = rLook( color );");
+} else {
+  THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment
+    .replace("color = agxDefaultContrastApprox( color );",
+             "color = clamp( ( color - 0.606 ) * 1.2 + 0.606, 0.0, 1.0 );\n\tcolor = agxDefaultContrastApprox( color );");
+}
+renderer.toneMapping = THREE.AgXToneMapping;
+const EXPOSURE = Math.pow(2, -0.2);
+renderer.toneMappingExposure = EXPOSURE;
+renderer.shadowMap.enabled = true;
+// baked export: PCF with a radius, soft like the renders' 1 degree sun
+renderer.shadowMap.type = LIGHT ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;     // the sun never moves: draw once
+stage.appendChild(renderer.domElement);
+// if the phone drops the 3-D context (out of graphics memory), say so and
+// offer a reload instead of freezing on a blank screen
+renderer.domElement.addEventListener("webglcontextlost", (e) => {
+  e.preventDefault();
+  // first time on a phone with the baked extras: reload once in lite mode
+  if (PHONE && !LITE && SITE.light) {
+    localStorage.setItem(LITE_KEY, "1");
+    location.reload();
+    return;
+  }
+  const l = document.getElementById("loading");
+  document.getElementById("loadText").textContent =
+    "The phone ran out of graphics memory. Tap to reload.";
+  document.getElementById("loadBar").parentElement.hidden = true;
+  l.hidden = false;
+  l.addEventListener("click", () => location.reload(), { once: true });
+});
+
+const scene = new THREE.Scene();
+// clear afternoon sky: deep blue overhead fading to a pale haze at the
+// horizon, warm ground below (an equirectangular gradient)
+{
+  const c = document.createElement("canvas");
+  c.width = 16; c.height = 256;
+  const g = c.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, "#3f78c4");
+  grad.addColorStop(0.32, "#7ba7dc");
+  grad.addColorStop(0.47, "#c9dcec");
+  grad.addColorStop(0.5, "#e4ebee");
+  grad.addColorStop(0.53, "#a79c8c");
+  grad.addColorStop(1.0, "#6f665a");
+  g.fillStyle = grad; g.fillRect(0, 0, 16, 256);
+  const sky = new THREE.CanvasTexture(c);
+  sky.mapping = THREE.EquirectangularReflectionMapping;
+  sky.colorSpace = THREE.SRGBColorSpace;
+  scene.background = sky;
+  scene.backgroundIntensity = 1.25;
+}
+// baked export: the renders' Cycles sky (same grade) as the background, and
+// as the reflections on the outside surfaces and glass
+let skyEnv = null, skyDome = null;
+if (LIGHT && LIGHT.sky) {
+  new THREE.TextureLoader().load("tex/" + (PHONE && LIGHT.sky_phone || LIGHT.sky), (t) => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    const old = scene.background;
+    if (PHONE) {
+      // phones: the sky on a dome round the camera, sampled straight from
+      // the image (an equirect background becomes a mipmapped cube map
+      // plus six depth buffers, ~14 MB of GPU memory)
+      t.generateMipmaps = false;
+      t.minFilter = THREE.LinearFilter;
+      skyDome = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 16), new THREE.ShaderMaterial({
+        uniforms: { map: { value: t }, k: { value: LIGHT.sky_intensity } },
+        vertexShader: `varying vec3 vDir;
+void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+        fragmentShader: `uniform sampler2D map; uniform float k; varying vec3 vDir;
+void main() {
+  vec3 d = normalize( vDir );
+  vec2 uv = vec2( atan( d.z, d.x ) * 0.15915494 + 0.5, asin( clamp( d.y, -1.0, 1.0 ) ) * 0.31830989 + 0.5 );
+  gl_FragColor = vec4( texture2D( map, uv ).rgb * k, 1.0 );
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`,
+        side: THREE.BackSide, depthWrite: false }));
+      skyDome.renderOrder = -1;
+      skyDome.frustumCulled = false;
+      scene.add(skyDome);
+      scene.background = null;
+    } else {
+      t.mapping = THREE.EquirectangularReflectionMapping;
+      scene.background = t;
+      scene.backgroundIntensity = LIGHT.sky_intensity;
+      if (!LIGHT.probe) setEnv(pmrem.fromEquirectangular(t).texture);
+    }
+    if (old && old.isTexture) old.dispose();
+  });
+  // reflections: Cycles 360 of the yard (falls back to the sky)
+  if (LIGHT.probe && !PHONE) new THREE.TextureLoader().load("tex/" + LIGHT.probe, (t) => {
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    setEnv(pmrem.fromEquirectangular(t).texture);
+  });
+}
+function setEnv(tex) {
+  skyEnv = tex;
+  for (const m of skyEnvMats) { m.envMap = skyEnv; m.needsUpdate = true; }
+}
+// phones skip the probe (GPU memory) and reflect the studio environment
+const ENV_I = LIGHT ? (PHONE ? 1.0 : LIGHT.probe ? LIGHT.probe_intensity : LIGHT.sky_intensity) : 1;
+const skyEnvMats = [];
+scene.fog = new THREE.Fog(0xd6e2ea, 35, 90);
+// baked export: haze the colour of the renders' horizon, further out
+if (LIGHT && LIGHT.fog) {
+  scene.fog.color.setRGB(LIGHT.fog[0], LIGHT.fog[1], LIGHT.fog[2], THREE.SRGBColorSpace);
+  scene.fog.near = 150; scene.fog.far = 1500;  // a light haze; the sky's lower half is far ground
+}
+// soft studio reflections for the glossy surfaces (paint, glass, lacquer)
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+// phones never build another environment: free the generator's working
+// render targets (~15 MB of GPU memory)
+if (PHONE) pmrem.dispose();
+if (LIGHT && PHONE) setEnv(scene.environment);
+scene.environmentIntensity = 0.35;
+const hemi = new THREE.HemisphereLight(0xeef3ff, 0x8a7560, 1.5);
+scene.add(hemi);
+const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+scene.add(ambient);
+// baked export: the outside no longer uses this fill (lightmap / open sky), so
+// it is the rooms' light: warm like the renders' 3000 K lamps
+const INDOOR = { ev: 0, k: 0 };
+if (LIGHT && LIGHT.indoor_fill) {
+  // baked rooms: the fill only reaches what's left unbaked indoors (fittings,
+  // fans, glass), at the rooms' own baked light level
+  const f = LIGHT.indoor_fill, l = (f[0] + f[1] + f[2]) / 3;
+  hemi.color.setRGB(f[0] / l, f[1] / l, f[2] / l); hemi.groundColor.setRGB(0.6 * f[0] / l, 0.5 * f[1] / l, 0.4 * f[2] / l);
+  hemi.intensity = 1.3 * l; ambient.color.copy(hemi.color); ambient.intensity = 0.3 * l;
+} else if (LIGHT) {
+  hemi.color.set(0xffc690); hemi.groundColor.set(0xa8764c); hemi.intensity = 1.9;
+  ambient.color.set(0xffcca0); ambient.intensity = 0.4;
+}
+// December, about 4 pm: sun on bearing 228 deg (south-west), 35 deg up,
+// as in the renders.  Plan (x east, y north) -> three (x, z = -y).
+const SUN_AZ = LIGHT ? LIGHT.sun_az : 228 * Math.PI / 180;
+const SUN_EL = LIGHT ? LIGHT.sun_el : 35 * Math.PI / 180;
+const sun = new THREE.DirectionalLight(0xfff3e2, 3.2);
+// baked export: the renders' sun (strength, white balance and exposure
+// folded into a linear colour, intensity 1)
+if (LIGHT) { sun.color.setRGB(LIGHT.sun[0], LIGHT.sun[1], LIGHT.sun[2], THREE.LinearSRGBColorSpace); sun.intensity = 1; }
+const SUN_C = new THREE.Vector3(6.5, 0, -6);          // middle of the plot
+sun.position.set(Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.sin(SUN_EL),
+                 -Math.cos(SUN_AZ) * Math.cos(SUN_EL)).multiplyScalar(45).add(SUN_C);
+sun.target.position.copy(SUN_C);
+sun.castShadow = true;
+{
+  const big = !PHONE && renderer.capabilities.maxTextureSize >= 8192;
+  // phones: 1024 (the map and its depth buffer were ~33 MB at 2048)
+  const sm = PHONE ? 1024 : big ? 4096 : 2048;
+  sun.shadow.mapSize.set(sm, sm);
+  const c = sun.shadow.camera;
+  c.left = -19; c.right = 19; c.top = 19; c.bottom = -19; c.near = 5; c.far = 95;
+  if (LIGHT) {
+    // fit the frustum to the plot (and the house's height) as the sun sees
+    // it: sharper shadow edges than a fixed 40 m square
+    const P = SITE.plot, pts = [];
+    // the plot plus the shadows it throws outside (fence, roof tanks)
+    for (const x of [P[0] - 8, P[2] + 8]) for (const y of [P[1] - 8, P[3] + 8])
+      for (const z of [-0.5, 6.5]) pts.push(new THREE.Vector3(x, z, -y));
+    const look = new THREE.Matrix4().lookAt(sun.position, SUN_C, new THREE.Vector3(0, 1, 0));
+    const inv = new THREE.Matrix4().makeRotationFromQuaternion(
+      new THREE.Quaternion().setFromRotationMatrix(look)).invert();
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const p of pts) {
+      const q = p.clone().sub(sun.position).applyMatrix4(inv);
+      x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y);
+    }
+    c.left = x0; c.right = x1; c.bottom = y0; c.top = y1;
+    c.updateProjectionMatrix();
+    sun.shadow.radius = 4;
+    sun.shadow.blurSamples = 16;
+  }
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.03;
+  sun.shadow.radius = 3;
+}
+scene.add(sun, sun.target);
+
+const camera = new THREE.PerspectiveCamera(68, 1, 0.05, 200);
+camera.rotation.order = "YXZ";
+
+// ambient occlusion (GTAO) at half resolution, computers only; switched off
+// by itself if the machine can't keep up
+const composer = PHONE ? null : new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, {
+  type: THREE.HalfFloatType, samples: renderer.capabilities.isWebGL2 ? 4 : 0 }));
+const gtao = PHONE ? { enabled: false } : new GTAOPass(scene, camera, 1, 1);
+if (!PHONE) {
+  composer.addPass(new RenderPass(scene, camera));
+  gtao.output = GTAOPass.OUTPUT.Default;
+  gtao.blendIntensity = 0.9;
+  gtao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.5, thickness: 1.0,
+                            scale: 1.0, samples: 12 });
+  gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6,
+                          rings: 2, samples: 12 });
+  {
+    const setSize = gtao.setSize.bind(gtao);
+    gtao.setSize = (w, h) => setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
+  }
+  composer.addPass(gtao);
+  composer.addPass(new OutputPass());
+  if (LIGHT) gtao.enabled = false;         // baked: occlusion is in the lightmaps
+}
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enabled = false;
+orbit.enableDamping = true;
+orbit.target.set(3.8, 0, -5.8);
+orbit.maxPolarAngle = Math.PI * 0.47;
+orbit.minDistance = 4;
+orbit.maxDistance = 40;
+
+// everything hung from the ceiling (lifted off in the overview)
+let ceilings = [];
+function showCeilings(v) {
+  for (const c of ceilings) c.visible = v;
+  renderer.shadowMap.needsUpdate = true;
+}
+// start in the street, facing the gate (the first chip)
+const player = { x: STOPS[0][1][0], y: STOPS[0][1][1], yaw: 0, pitch: -0.05, level: "ground", z: -0.4 };
+let mode = "walk";
+
+function lookAt(from, to) {
+  const dx = to[0] - from[0], dy = to[1] - from[1];
+  // three forward = (-sin yaw, -cos yaw) in (x, z); z = -y
+  player.yaw = Math.atan2(-dx, dy);
+  player.pitch = -0.05;
+}
+lookAt([player.x, player.y], STOPS[0][2]);
+
+function blocked(x, y) {
+  for (const [x0, y0, x1, y1] of WALLS) {
+    if (x > x0 - RADIUS && x < x1 + RADIUS && y > y0 - RADIUS && y < y1 + RADIUS) return true;
+  }
+  return x < PLOT[0] - 12 || x > PLOT[2] + 3 || y < PLOT[1] - 6 || y > PLOT[3] + 6;
+}
+
+// height of the stair surface under (x, y), or null when not on the stair
+function stairAt(x, y) {
+  const up = x >= XE && x <= XE + STAIR_W, low = x > XE + STAIR_W && x <= XE + 2 * STAIR_W;
+  if ((up || low) && y >= HALF_Y0 && y < Y_UP0) return BASE_Z + N_LOW * RISE;  // half landing
+  if (up && y >= Y_UP0 && y <= LAND_Y1) {
+    if (y >= LAND_Y0) return ROOF_Z;
+    return BASE_Z + (N_LOW + Math.min(N_UP - 1, Math.floor((y - Y_UP0) / GOING) + 1)) * RISE;
+  }
+  if (low && y >= Y_UP0 && y < Y_UP0 + (N_LOW - 1) * GOING)
+    return BASE_Z + (N_LOW - 1 - Math.floor((y - Y_UP0) / GOING)) * RISE;
+  return null;
+}
+function onStair(x, y) { return stairAt(x, y) !== null; }
+function floorAt(x, y) {
+  const s = stairAt(x, y);
+  if (s !== null) return s;
+  if (player.level === "roof") return ROOF_Z;
+  // indoors (and on the porch) at floor level, outside on the ground
+  return FOOT.some(([x0, y0, x1, y1]) => x >= x0 && x <= x1 && y >= y0 && y <= y1)
+    ? 0 : GROUND_Z;
+}
+function roofBlocked(x, y) {
+  const r = RADIUS * 0.6;
+  return !ROOF_AREAS.some(([x0, y0, x1, y1]) =>
+    x >= x0 + r && x <= x1 - r && y >= y0 + r && y <= y1 - r);
+}
+function tryMove(nx, ny) {
+  const here = floorAt(player.x, player.y);
+  if (player.level === "roof") {
+    if (onStair(nx, ny)) { player.level = "ground"; return true; }
+    return !roofBlocked(nx, ny);
+  }
+  // at the stair head, stepping west through the parapet gap onto the roof
+  if (here >= ROOF_Z - 0.01 && nx < XE && ny > LAND_Y0 && ny < LAND_Y1) {
+    player.level = "roof"; return true;
+  }
+  // on the roof stair, one step at a time (no jumping off mid-flight)
+  if ((onStair(nx, ny) || onStair(player.x, player.y)) &&
+      Math.abs(floorAt(nx, ny) - here) > RISE + 0.02) return false;
+  return !blocked(nx, ny);
+}
+
+function roomAt(x, y) {
+  if (player.level === "roof") return "Roof";
+  if (onStair(x, y)) return "Roof stairs";
+  for (const [name, x0, y0, x1, y1] of ROOMS) {
+    if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return name;
+  }
+  return "Outside";
+}
+
+const DIRS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+const roomName = document.getElementById("roomName");
+const roomMeta = document.getElementById("roomMeta");
+const needle = document.getElementById("needle");
+let lastRoom = "";
+function updateHud() {
+  const fx = -Math.sin(player.yaw), fy = Math.cos(player.yaw);
+  let bearing = Math.atan2(fx, fy) * 180 / Math.PI;
+  if (mode === "over") {
+    const d = new THREE.Vector3(); camera.getWorldDirection(d);
+    bearing = Math.atan2(d.x, -d.z) * 180 / Math.PI;
+  }
+  bearing = (bearing + 360) % 360;
+  needle.style.transform = `rotate(${-bearing}deg)`;
+  if (mode === "pano") {
+    roomName.textContent = panoOn ? panoOn.label : "360° photo";
+    roomMeta.textContent = `Facing ${DIRS[Math.round(bearing / 45) % 8]} · ` +
+      (!(panoSphere.material.map && panoSphere.material.map.image) ? "loading the photo…"
+       : "360° photo · drag to look around");
+    lastRoom = "";
+    return;
+  }
+  if (mode === "over") {
+    roomName.textContent = "Overview";
+    roomMeta.textContent = "Roof off · pinch to zoom, drag to turn";
+    return;
+  }
+  const r = roomAt(player.x, player.y);
+  if (r !== lastRoom) {
+    lastRoom = r;
+    updateButtons();
+    roomName.textContent = r;
+    for (const c of chips.children) c.setAttribute("aria-current", c.dataset.room === r ? "true" : "false");
+  }
+  roomMeta.textContent = `Facing ${DIRS[Math.round(bearing / 45) % 8]} · ` +
+    (player.level === "roof" ? "roof at 3.4 m" : "3.1 m ceilings");
+}
+
+// ---------- input: look (drag), walk (joystick / keys) ----------
+const look = { id: null, x: 0, y: 0 };
+const joy = { id: null, cx: 0, cy: 0, vx: 0, vy: 0 };
+const joyEl = document.getElementById("joy"), knob = document.getElementById("knob");
+const hint = document.getElementById("hint");
+function dismissHint() { if (!hint.hidden) hint.hidden = true; }
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  if ((mode !== "walk" && mode !== "pano") || look.id !== null) return;
+  look.id = e.pointerId; look.x = e.clientX; look.y = e.clientY;
+  try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+});
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (e.pointerId !== look.id) return;
+  const k = 0.0045;
+  player.yaw += (e.clientX - look.x) * k;
+  player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch + (e.clientY - look.y) * k));
+  look.x = e.clientX; look.y = e.clientY;
+  dismissHint();
+});
+const endLook = (e) => { if (e.pointerId === look.id) look.id = null; };
+renderer.domElement.addEventListener("pointerup", endLook);
+renderer.domElement.addEventListener("pointercancel", endLook);
+
+joyEl.addEventListener("pointerdown", (e) => {
+  if (joy.id !== null && joy.id !== e.pointerId) return;   // a second finger
+  const r = joyEl.getBoundingClientRect();
+  joy.id = e.pointerId; joy.cx = r.left + r.width / 2; joy.cy = r.top + r.height / 2;
+  try { joyEl.setPointerCapture(e.pointerId); } catch (err) { /* window handlers cover it */ }
+  moveJoy(e); dismissHint();
+});
+function moveJoy(e) {
+  const max = 40;
+  let dx = e.clientX - joy.cx, dy = e.clientY - joy.cy;
+  const len = Math.hypot(dx, dy);
+  if (len > max) { dx *= max / len; dy *= max / len; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  joy.vx = dx / max; joy.vy = dy / max;
+}
+joyEl.addEventListener("pointermove", (e) => { if (e.pointerId === joy.id) moveJoy(e); });
+const endJoy = (e) => {
+  if (e.pointerId !== joy.id) return;
+  joy.id = null; joy.vx = joy.vy = 0; knob.style.transform = "";
+};
+joyEl.addEventListener("pointerup", endJoy);
+joyEl.addEventListener("pointercancel", endJoy);
+// phones don't always deliver the pointerup (system gestures, the stick
+// hidden mid-drag, capture lost): release on any of these too, so the stick
+// can never stay pushed
+joyEl.addEventListener("lostpointercapture", endJoy);
+addEventListener("pointerup", endJoy);
+addEventListener("pointercancel", endJoy);
+renderer.domElement.addEventListener("lostpointercapture", endLook);
+function releaseAll() {
+  if (joy.id !== null) endJoy({ pointerId: joy.id });
+  look.id = null;
+  keys.clear();
+}
+addEventListener("blur", releaseAll);
+document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll(); });
+
+const keys = new Set();
+addEventListener("keydown", (e) => { keys.add(e.key.toLowerCase()); });
+addEventListener("keyup", (e) => { keys.delete(e.key.toLowerCase()); });
+
+// ---------- modes & rooms ----------
+const roofBtn = document.getElementById("roofBtn");
+let roofOn = false;
+roofBtn.addEventListener("click", () => {
+  roofOn = !roofOn;
+  roofBtn.setAttribute("aria-pressed", roofOn);
+  roofBtn.textContent = roofOn ? "Roof: on" : "Roof: off";
+  if (mode === "over") showCeilings(roofOn);
+});
+const btnWalk = document.getElementById("modeWalk"), btnOver = document.getElementById("modeOver");
+const joyRow = document.querySelector(".controls-row");
+function setMode(m) {
+  if (mode === "pano" && m !== "pano") leavePano();
+  mode = m;
+  btnWalk.setAttribute("aria-pressed", m === "walk");
+  btnOver.setAttribute("aria-pressed", m === "over");
+  joyRow.hidden = m !== "walk";
+  document.getElementById("photoLabel").textContent =
+    m === "pano" ? "Exit 360° photo" : "360° photo";
+  orbit.enabled = m === "over";
+  roofBtn.hidden = m !== "over";
+  showCeilings(m !== "over" || roofOn);
+  if (m === "over") {
+    camera.position.set(-10, 17, 7);
+    orbit.target.set(3.8, 0, -5.8);
+    camera.fov = 45; camera.updateProjectionMatrix();
+    orbit.update();
+  } else {
+    camera.fov = 68; camera.updateProjectionMatrix();
+  }
+  lastRoom = "";
+  applyBaked();
+  updateButtons();
+  updateHud();
+}
+btnWalk.addEventListener("click", () => setMode("walk"));
+btnOver.addEventListener("click", () => setMode("over"));
+
+// ---------- 360-degree photos (Cycles panoramas) & baked lighting ----------
+// PANOS: [{name, file, x, y}] from scripts/render.py; the image centre faces north
+const PANOS = SITE.panos || [];
+const PANO_LABEL = { Living: "Living room", Nook: "Entry nook", Dining: "Dining",
+  Kitchen: "Kitchen", MasterBed: "Master bedroom", MasterBath: "Master bathroom",
+  WalkIn: "Walk-in closet", Bedroom2: "Bedroom 2", Office: "Office / guest",
+  Hall: "Hall", GuestToilet: "Guest toilet", Lobby: "Lobby", Laundry: "Laundry",
+  DirtyKitchen: "Dirty kitchen + pantry", Store: "Store", WC: "W/C",
+  Utility: "Utility", Corridor: "Corridor", Porch: "Porch", Driveway: "Driveway",
+  NorthPath: "North path", EastYard: "East yard", Roof: "Roof",
+  GuardHouse: "Guard house", Bathhouse: "Outdoor bathroom" };
+const panoScene = new THREE.Scene();
+const panoSphere = new THREE.Mesh(new THREE.SphereGeometry(20, 64, 32).scale(-1, 1, 1),
+  new THREE.MeshBasicMaterial({ toneMapped: false, color: 0x202020 }));
+panoSphere.rotation.y = -Math.PI / 2;
+panoScene.add(panoSphere);
+const panoTex = {};
+let panoOn = null;
+const photoBtn = document.getElementById("photoBtn");
+// the pulse stops once this viewer has opened a 360 photo (remembered per
+// browser when storage is available)
+try { if (localStorage.getItem("dalaba_pano_used")) photoBtn.classList.remove("pulse"); }
+catch (e) { /* storage blocked: keep pulsing */ }
+const bakeBtn = document.getElementById("bakeBtn");
+function nearestPano(x = player.x, y = player.y, roof = player.level === "roof") {
+  const r = roof ? "Roof" : roomAt(x, y);
+  let best = null, bd = 1e9;
+  for (const p of PANOS) {
+    if (((p.floor || 0) >= 3) !== roof) continue;      // roof photos on the roof
+    const d = Math.hypot(p.x - x, p.y - y);
+    const reach = roof || r === "Outside" ? 8 : 4.5;
+    if (d < bd && (roof || roomAt(p.x, p.y) === r || d < 1.5) && d < reach) {
+      best = p; bd = d;
+    }
+  }
+  return best;
+}
+function enterPano(p) {
+  panoOn = { ...p, label: PANO_LABEL[p.name] || p.name };
+  player.x = p.x; player.y = p.y; player.z = p.floor || 0;
+  player.level = (p.floor || 0) >= 3 ? "roof" : "ground";
+  for (const f of Object.keys(panoTex)) {         // one 4096 photo at a time
+    if (f !== p.file) { panoTex[f].dispose(); delete panoTex[f]; }
+  }
+  if (!panoTex[p.file]) {
+    panoTex[p.file] = new THREE.TextureLoader().load("pano/" + p.file, (t) => {
+      if (panoOn && panoOn.file === p.file) { panoSphere.material.color.set(0xffffff); }
+    });
+    panoTex[p.file].colorSpace = THREE.SRGBColorSpace;
+    panoTex[p.file].anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    if (PHONE) {                            // no mipmaps: a third less memory
+      panoTex[p.file].generateMipmaps = false;
+      panoTex[p.file].minFilter = THREE.LinearFilter;
+    }
+    panoSphere.material.color.set(0x202020);
+  } else {
+    panoSphere.material.color.set(panoTex[p.file].image ? 0xffffff : 0x202020);
+  }
+  panoSphere.material.map = panoTex[p.file];
+  panoSphere.material.needsUpdate = true;
+  setMode("pano");
+}
+function leavePano() { panoOn = null; }
+photoBtn.addEventListener("click", () => {
+  photoBtn.classList.remove("pulse");
+  try { localStorage.setItem("dalaba_pano_used", "1"); } catch (e) { /* ignore */ }
+  if (mode === "pano") { setMode("walk"); return; }
+  const p = nearestPano();
+  if (p) enterPano(p);
+});
+
+// lighting: baked (Cycles lightmap) or live (real-time lights), where baked
+let bakedOn = true;
+const bakedMeshes = [], bakedBoxes = [];
+function inBakedRoom() {
+  const v = new THREE.Vector3(player.x, 1.0, -player.y);
+  return bakedBoxes.some((b) => b.containsPoint(v));
+}
+// the bake has the roof on, so the overview (roof off, sun from above) uses
+// live light everywhere
+function applyBaked() {
+  for (const m of bakedMeshes) {
+    const use = bakedOn && (mode !== "over" || m.userData.baked.userData.outdoor);
+    m.material = use ? m.userData.baked : m.userData.live;
+  }
+}
+bakeBtn.addEventListener("click", () => {
+  bakedOn = !bakedOn;
+  applyBaked();
+  bakeBtn.setAttribute("aria-pressed", bakedOn);
+  bakeBtn.textContent = bakedOn ? "Baked light: on" : "Baked light: off";
+});
+function updateButtons() {
+  photoBtn.hidden = !(mode === "pano" || (mode === "walk" && nearestPano()));
+  bakeBtn.hidden = !(mode === "walk" && bakedBoxes.length && inBakedRoom());
+}
+
+const chips = document.getElementById("chips");
+for (const [label, from, to, level] of STOPS) {
+  const b = document.createElement("button");
+  b.className = "chip"; b.textContent = label;
+  b.dataset.room = level === "roof" ? "Roof" : roomAt(from[0], from[1]);
+  b.addEventListener("click", () => {
+    // in photo mode, jump straight to that area's 360 photo (if it has one)
+    if (mode === "pano") {
+      // the photo named like the chip first (e.g. Porch), else the nearest
+      const byName = PANOS.find((q) => (PANO_LABEL[q.name] || q.name).toLowerCase()
+        .startsWith(label.toLowerCase()));
+      const p = byName || nearestPano(from[0], from[1], level === "roof");
+      if (p) { lookAt(from, to); enterPano(p); return; }
+    }
+    player.x = from[0]; player.y = from[1]; lookAt(from, to);
+    player.level = level || "ground"; player.z = floorAt(player.x, player.y);
+    setMode("walk");
+  });
+  chips.appendChild(b);
+}
+
+// ---------- load the model ----------
+let loaded = 0;
+const loadText = document.getElementById("loadText"), loadBar = document.getElementById("loadBar");
+function loadScript(src) {
+  return new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = ok;
+    s.onerror = () => fail(new Error("couldn't fetch the model file"));
+    document.head.appendChild(s);
+  });
+}
+async function fetchGlb() {
+  // the plain .glb (GitHub Pages serves it): no base64 strings to decode, so
+  // a phone holds one copy of the model instead of four
+  const res = await fetch("dalaba_model.glb");
+  if (!res.ok) throw new Error("no .glb");
+  // content-length is the gzipped size on GitHub Pages: collect the chunks
+  // and use it for the progress bar only
+  const total = +res.headers.get("content-length") || 0;
+  if (!res.body) return new Uint8Array(await res.arrayBuffer());
+  const rd = res.body.getReader(), chunks = [];
+  let o = 0;
+  for (;;) {
+    const { done, value } = await rd.read();
+    if (done) break;
+    chunks.push(value); o += value.length;
+    if (total) loadBar.style.width = `${5 + 70 * Math.min(1, o / (total * 1.6))}%`;
+  }
+  const buf = new Uint8Array(o);
+  for (let i = 0, p = 0; i < chunks.length; p += chunks[i].length, chunks[i++] = null) buf.set(chunks[i], p);
+  return buf;
+}
+async function loadModel() {
+  loadBar.style.width = "5%";
+  let glb = null;
+  try { glb = await fetchGlb(); } catch (e) { console.warn("glb", e); glb = null; }
+  if (glb) {
+    loadText.textContent = "Building the house…";
+    loadBar.style.width = "80%";
+    await new Promise((r) => setTimeout(r, 30));
+    return finishModel(await new GLTFLoader().parseAsync(glb.buffer, ""));
+  }
+  loadBar.style.width = "35%";
+  // base64 GLB in parts (artifacts cap each file at 16 MB)
+  for (let i = 0; i < 3; i++) {
+    await loadScript(`dalaba_model_${i}.js`);
+    loadBar.style.width = `${35 + 40 * (i + 1) / 3}%`;
+  }
+  loadText.textContent = "Building the house…";
+  loadBar.style.width = "80%";
+  await new Promise((r) => setTimeout(r, 30));
+  // decode part by part (each is a whole number of base64 quads) so the
+  // whole model never sits in memory as one giant string
+  const parts = window.DALABA_GLB, bytes = [];
+  let total = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const bin = atob(parts[i]);
+    parts[i] = null;
+    const b = new Uint8Array(bin.length);
+    for (let j = 0; j < bin.length; j++) b[j] = bin.charCodeAt(j);
+    bytes.push(b); total += b.length;
+  }
+  delete window.DALABA_GLB;
+  const buf = new Uint8Array(total);
+  for (let i = 0, o = 0; i < bytes.length; o += bytes[i].length, i++) buf.set(bytes[i], o);
+  bytes.length = 0;
+  return finishModel(await new GLTFLoader().parseAsync(buf.buffer, ""));
+}
+async function finishModel(gltf) {
+  // Textures ship as plain files in tex/ (images embedded in the GLB don't
+  // load inside the artifact frame).  Each material shows its image's
+  // average colour first, so it keeps its colour even if an image fails.
+  const TEX = SITE.tex || {};
+  const texLoader = new THREE.TextureLoader();
+  const texCache = {};
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  function applyTexture(m, t0) {
+    // phones: the half-size copy and no normal map (GPU memory)
+    const t = PHONE ? { ...t0, file: t0.file_phone || t0.file, normal: null } : t0;
+    m.color.setRGB(t.mean[0], t.mean[1], t.mean[2], THREE.SRGBColorSpace);
+    if (!texCache[t.file]) {
+      texCache[t.file] = new Promise((ok) => texLoader.load(
+        "tex/" + t.file, (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          tex.flipY = false;
+          tex.anisotropy = Math.min(8, aniso);
+          ok(tex);
+        }, undefined, () => ok(null)));
+    }
+    texCache[t.file].then((tex) => {
+      if (!tex) return;
+      m.map = tex;
+      m.color.set(0xffffff);
+      m.needsUpdate = true;
+    });
+    if (t.normal) {
+      if (!texCache[t.normal]) {
+        texCache[t.normal] = new Promise((ok) => texLoader.load(
+          "tex/" + t.normal, (tex) => {
+            tex.colorSpace = THREE.NoColorSpace;
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.flipY = false;
+            tex.anisotropy = Math.min(8, aniso);
+            ok(tex);
+          }, undefined, () => ok(null)));
+      }
+      texCache[t.normal].then((tex) => {
+        if (!tex || !m.isMeshStandardMaterial) return;
+        m.normalMap = tex;
+        m.normalScale.set(1, 1);
+        m.needsUpdate = true;
+      });
+    }
+  }
+  // Baked rooms: their meshes (LM_<room>) carry a second UV set for the
+  // lightmap.  Baked materials take all their light from it: real-time lights
+  // are cut out of the shader, reflections are kept (dimmed where it's dark).
+  const LM = SITE.lightmaps || {};
+  const ROOM_ENV_I = 0.8;
+  const lmCache = {}, bakedMat = {};
+  // outside bake (lm.sun): the lightmap holds everything but the sun's
+  // direct light, so the real-time sun (and its shadows) stays on
+  const BEGIN_SUN = THREE.ShaderChunk.lights_fragment_begin
+    .replace("vec3 irradiance = getAmbientLightIrradiance( ambientLightColor );",
+             "vec3 irradiance = vec3( 0.0 );")
+    .replace("( NUM_HEMI_LIGHTS > 0 )", "defined( BAKED_NEVER )")
+    .replace("defined( USE_LIGHT_PROBES )", "defined( BAKED_NEVER )");
+  const BEGIN = BEGIN_SUN
+    .replace(/defined\( RE_Direct \)/g, "defined( BAKED_NEVER )")
+    .replace("defined( RE_Direct_RectArea )", "defined( BAKED_NEVER )");
+  const MAPS = THREE.ShaderChunk.lights_fragment_maps
+    .replace("iblIrradiance += getIBLIrradiance( geometryNormal );", "") + `
+#if defined( USE_LIGHTMAP ) && defined( RE_IndirectSpecular )
+  radiance *= clamp( dot( lightMapIrradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) / 3.14159, 0.0, 1.0 );
+#endif`;
+  function lightmap(file) {
+    if (!lmCache[file]) {
+      const t = texLoader.load("tex/" + file);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.flipY = false;
+      t.channel = 1;
+      // no mipmaps: smaller levels would blend the gaps between the atlas's
+      // islands into the walls (dark, dirty-looking edges at a distance)
+      t.generateMipmaps = false;
+      t.minFilter = THREE.LinearFilter;
+      lmCache[file] = t;
+    }
+    return lmCache[file];
+  }
+  function bakeMaterial(m, lm) {
+    const key = m.uuid + lm.file;
+    if (bakedMat[key]) return bakedMat[key];
+    const b = m.clone();
+    b.lightMap = lightmap(PHONE && lm.file_phone ? lm.file_phone : lm.file);
+    // the file holds L / scale with the renders' exposure folded in
+    b.lightMapIntensity = lm.intensity ??
+      lm.scale * Math.PI / Math.pow(2, lm.exposure ?? -0.2);
+    // "knee": stored as e = x / (1 + x), decoded here
+    const maps = lm.encoding === "knee" ? MAPS.replace(
+      "vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;",
+      "vec3 lmE = min( lightMapTexel.rgb, vec3( 0.996 ) );\n\tvec3 lightMapIrradiance = lmE / ( 1.0 - lmE ) * lightMapIntensity;") : MAPS;
+    b.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <lights_fragment_begin>", lm.sun ? BEGIN_SUN : BEGIN)
+        .replace("#include <lights_fragment_maps>", maps);
+    };
+    b.customProgramCacheKey = () => (lm.sun ? "baked_sun_" + (lm.encoding || "") : "baked");
+    // rooms reflect the room environment (dimmed by their light), not the yard
+    if (lm.sun && !lm.interior) {
+      b.userData.outdoor = true;
+      if (LIGHT && LIGHT.sky) { b.envMapIntensity = ENV_I; skyEnvMats.push(b); if (skyEnv) b.envMap = skyEnv; }
+    } else if (lm.interior) {
+      // the studio environment, scaled so that (after the dimming by the
+      // baked light) a reflection is about as bright as the room's walls
+      b.envMap = scene.environment; b.envMapIntensity = ROOM_ENV_I;
+    }
+    return (bakedMat[key] = b);
+  }
+  function lmOf(n) {
+    for (let o = n; o; o = o.parent) if (LM[o.name]) return [o, LM[o.name]];
+    return [null, null];
+  }
+  // baked export: outdoor things that aren't baked (plants, trees, ground,
+  // fittings) take the bake's open-sky light instead of the indoor fill
+  const OPEN = LIGHT && LIGHT.open_up && LIGHT.house_box ? (() => {
+    const f = (v) => `vec3( ${v.map((c) => c.toFixed(4)).join(", ")} )`;
+    return THREE.ShaderChunk.lights_fragment_begin
+      .replace("vec3 irradiance = getAmbientLightIrradiance( ambientLightColor );",
+        `vec3 irradiance = mix( ${f(LIGHT.open_down)}, ${f(LIGHT.open_up)}, 0.5 + 0.5 * dot( geometryNormal, hemisphereLights[ 0 ].direction ) );`)
+      .replace("( NUM_HEMI_LIGHTS > 0 )", "defined( BAKED_NEVER )")
+      .replace("defined( USE_LIGHT_PROBES )", "defined( BAKED_NEVER )");
+  })() : null;
+  const openMat = {};
+  function outdoorMaterial(m) {
+    if (openMat[m.uuid]) return openMat[m.uuid];
+    const o = m.clone();
+    o.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <lights_fragment_begin>", OPEN)
+        .replace("#include <lights_fragment_maps>", MAPS);
+    };
+    o.customProgramCacheKey = () => "open_sky";
+    if (LIGHT.sky) { o.envMapIntensity = ENV_I; skyEnvMats.push(o); if (skyEnv) o.envMap = skyEnv; }
+    return (openMat[m.uuid] = o);
+  }
+  // baked export: plants carry their baked light per vertex (knee-encoded
+  // in the colour attribute); it replaces the fill, the sun stays live
+  const VL = (LIGHT && LIGHT.vlight) || {};
+  const vlMat = {};
+  function vertexLitMaterial(m, info) {
+    const vk = m.uuid + (info.interior ? "_in" : "") + (info.leaves ? "_leaf" : "");
+    if (vlMat[vk]) return vlMat[vk];
+    const o = m.clone();
+    o.vertexColors = true;
+    const K = info.intensity.toFixed(5);
+    const begin = THREE.ShaderChunk.lights_fragment_begin
+      .replace("vec3 irradiance = getAmbientLightIrradiance( ambientLightColor );",
+        `vec3 vlE = min( vColor.rgb, vec3( 0.996 ) );\n\tvec3 irradiance = vlE / ( 1.0 - vlE ) * ${K};`)
+      .replace("( NUM_HEMI_LIGHTS > 0 )", "defined( BAKED_NEVER )")
+      .replace("defined( USE_LIGHT_PROBES )", "defined( BAKED_NEVER )");
+    // reflections dimmed by the baked light, like the lightmapped surfaces
+    const vmaps = MAPS + `
+#if defined( RE_IndirectSpecular )
+  radiance *= clamp( dot( irradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) / 3.14159, 0.0, 1.0 );
+#endif`;
+    o.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <color_fragment>", "")
+        .replace("#include <lights_fragment_begin>", begin)
+        .replace("#include <lights_fragment_maps>", vmaps);
+    };
+    o.customProgramCacheKey = () => "vertex_lit";
+    // leaves are cards seen from both sides
+    if (info.leaves) o.side = THREE.DoubleSide;
+    // outdoors reflect the yard (probe); rooms their own environment
+    if (!info.interior) { o.envMapIntensity = ENV_I; skyEnvMats.push(o); if (skyEnv) o.envMap = skyEnv; }
+    else { o.envMap = scene.environment; o.envMapIntensity = ROOM_ENV_I; }
+    return (vlMat[vk] = o);
+  }
+  function vlOf(n) {
+    for (let o = n; o; o = o.parent)
+      if (VL[o.name]) return o.name === "LMV_PLANTS" ? { ...VL[o.name], leaves: true } : VL[o.name];
+    return null;
+  }
+  const HB = LIGHT && LIGHT.house_box, _bb = new THREE.Box3(), _c = new THREE.Vector3();
+  const HR = (LIGHT && LIGHT.house_rects) || (HB ? [HB] : []);
+  const inHouse = (x, y) => HR.some((r) => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]);
+  const allMats = [];
+  gltf.scene.traverse((n) => {
+    if (!n.isMesh) return;
+    const vli = vlOf(n);
+    if (vli && n.geometry.attributes.color && n.material.isMeshStandardMaterial) {
+      n.material = vertexLitMaterial(n.material, vli);
+    } else if (OPEN && !lmOf(n)[1] && n.material.isMeshStandardMaterial && !n.material.transparent) {
+      _bb.setFromObject(n).getCenter(_c);
+      const px = _c.x, py = -_c.z;      // three -> plan
+      if (n.name === "GROUND" || n.parent?.name === "GROUND" || !inHouse(px, py)) {
+        n.material = outdoorMaterial(n.material);
+      }
+    }
+    const tr = Array.isArray(n.material) ? n.material.some((m) => m.transparent)
+                                         : n.material.transparent;
+    n.castShadow = !tr;              // glass lets the sun through
+    n.receiveShadow = true;
+    const [root, lm] = lmOf(n);
+    if (lm && n.geometry.attributes.uv1 && !Array.isArray(n.material)) {
+      n.userData.live = n.material;
+      n.userData.baked = bakeMaterial(n.material, lm);
+      n.material = n.userData.baked;
+      bakedMeshes.push(n);
+      allMats.push(n.userData.live);
+      if (!lm.sun && !root.name.endsWith("_CEIL") && !root.userData.box) {
+        root.userData.box = new THREE.Box3().setFromObject(root);
+        bakedBoxes.push(root.userData.box);
+      }
+    }
+    for (const m of (Array.isArray(n.material) ? n.material : [n.material])) allMats.push(m);
+  });
+  for (const m of allMats) {
+    if (m.transparent) m.depthWrite = false;
+    // window panes reflect the sky / yard; shower screens and car glass don't
+    if (LIGHT && LIGHT.sky && m.transparent && /glass_window|glass_lowe/i.test(m.name) && !m.userData.sky) {
+      m.userData.sky = true;
+      m.envMapIntensity = ENV_I * 2.5;     // the pane's alpha halves it again
+      skyEnvMats.push(m);
+      if (skyEnv) m.envMap = skyEnv;
+    }
+    if (TEX[m.name] && !m.userData.tex) {
+      m.userData.tex = true;
+      applyTexture(m, TEX[m.name]);
+    }
+  }
+  gltf.scene.traverse((n) => {
+    if (n.name === "CEILING" || n.name.endsWith("_CEIL")) ceilings.push(n);
+  });
+  showCeilings(mode !== "over");
+  scene.add(gltf.scene);
+  renderer.shadowMap.needsUpdate = true;
+  loaded = performance.now();
+  updateButtons();
+  loadBar.style.width = "100%";
+  document.getElementById("loading").hidden = true;
+  await Promise.all([...Object.values(texCache), ...Object.values(lmCache).map((t) =>
+    new Promise((ok) => { const c = () => (t.image ? ok() : setTimeout(c, 100)); c(); }))]);
+  if (SHOT) { window.DALABA_SCENE = scene; window.DALABA_CAMERA = camera; window.DALABA_THREE = THREE; }
+  // ?debug=class: baked = green, outdoor open-sky = blue, indoor fill = red
+  // ?debug=light: textures off (white), to see the light alone
+  const DEBUG = new URLSearchParams(location.search).get("debug");
+  if (DEBUG) scene.traverse((n) => {
+    if (!n.isMesh) return;
+    const ms = [].concat(n.material).map((m) => {
+      const k = m.clone();
+      if (DEBUG === "class") {
+        k.map = null; k.normalMap = null;
+        k.color.set(m.userData.outdoor ? 0x30d040 : m.customProgramCacheKey?.() === "open_sky" ? 0x3060ff : 0xff4030);
+      } else if (DEBUG === "light") {
+        k.map = null; k.color.set(0xd0d0d0);
+      }
+      k.onBeforeCompile = m.onBeforeCompile; k.customProgramCacheKey = m.customProgramCacheKey;
+      k.userData = m.userData;
+      return k;
+    });
+    n.material = Array.isArray(n.material) ? ms : ms[0];
+  });
+  setTimeout(() => (window.DALABA_READY = true), 500);
+}
+loadModel().catch((err) => {
+  loadText.textContent = `The model didn't load (${err.message}). Reload the page to try again.`;
+});
+
+// ---------- loop ----------
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  if (composer) {
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(w, h);
+  }
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (mode === "walk") {
+    let fwd = -joy.vy, side = joy.vx;
+    if (keys.has("w") || keys.has("arrowup")) fwd += 1;
+    if (keys.has("s") || keys.has("arrowdown")) fwd -= 1;
+    if (keys.has("a")) side -= 1;
+    if (keys.has("d")) side += 1;
+    if (keys.has("arrowleft")) player.yaw += 1.8 * dt;
+    if (keys.has("arrowright")) player.yaw -= 1.8 * dt;
+    const mag = Math.min(1, Math.hypot(fwd, side));
+    if (mag > 0.05) {
+      const s = SPEED * dt;
+      // plan-space forward (fx, fy) and right (fy, -fx)
+      const fx = -Math.sin(player.yaw), fy = Math.cos(player.yaw);
+      const mx = (fx * fwd + fy * side) * s, my = (fy * fwd - fx * side) * s;
+      if (tryMove(player.x + mx, player.y)) player.x += mx;
+      if (tryMove(player.x, player.y + my)) player.y += my;
+    }
+    const target = floorAt(player.x, player.y);
+    player.z += (target - player.z) * Math.min(1, dt * 10);   // ease up/down steps
+    camera.position.set(player.x, player.z + EYE, -player.y);
+    camera.rotation.set(player.pitch, player.yaw, 0);
+    // eye adaptation: rooms are darker than the yard; open up indoors like a
+    // camera would (the renders' rooms use +2.3 EV over the outside)
+    if (LIGHT) {
+      const px = SHOT ? SHOT[0] : player.x, py = SHOT ? SHOT[1] : player.y;
+      const r = roomAt(px, py);
+      // on the sunlit white roof deck the renders stop down further
+      const onRoof = SHOT ? SHOT[2] > 4 && SHOT[2] < 8 : player.level === "roof";
+      const inside = !onRoof && ROOMS.some(([n]) => n === r) && r !== "Porch";
+      // the renders' exposure for this room (stops over the outside)
+      const RE = LIGHT.room_ev || { default: 0.9 };
+      const target = inside ? (RE[r] ?? RE.default) : onRoof ? (LIGHT.roof_ev ?? 0) : 0;
+      INDOOR.ev += (target - INDOOR.ev) * (SHOT ? 1 : Math.min(1, dt * 2.5));
+      renderer.toneMappingExposure = EXPOSURE * Math.pow(2, INDOOR.ev);
+    }
+    if (SHOT) {
+      camera.position.set(SHOT[0], SHOT[2], -SHOT[1]);
+      camera.rotation.set(SHOT[4], SHOT[3], 0);
+      if (camera.fov !== SHOT[5] || (SHOT[6] && !camera.view)) {
+        camera.fov = SHOT[5];
+        // the render camera's clip start (some see through a door or wall)
+        if (SHOT[7]) camera.near = Math.max(0.05, SHOT[7]);
+        const w = stage.clientWidth, h = stage.clientHeight;
+        if (SHOT[6]) camera.setViewOffset(w, h, 0, -SHOT[6] * Math.max(w, h), w, h);
+        camera.updateProjectionMatrix();
+      }
+    }
+  } else if (mode === "pano") {
+    if (keys.has("arrowleft")) player.yaw += 1.8 * dt;
+    if (keys.has("arrowright")) player.yaw -= 1.8 * dt;
+    camera.position.set(0, 0, 0);
+    camera.rotation.set(player.pitch, player.yaw, 0);
+  } else {
+    orbit.update();
+  }
+  updateHud();
+  if (skyDome) skyDome.position.copy(camera.position);
+  if (mode === "walk" && ++frames % 20 === 0) updateButtons();
+  if (mode === "pano") {
+    renderer.render(panoScene, camera);
+  } else {
+    if (composer) composer.render(dt); else renderer.render(scene, camera);
+    // baked rooms already carry their own AO: don't darken corners twice
+    gtaoWanted && (gtao.enabled = !(bakedOn && mode === "walk" && inBakedRoom()));
+    // AO costs a second pass: drop it if the machine can't hold ~35 fps
+    if (loaded && gtao.enabled) {
+      const t = performance.now() - loaded;
+      if (t > 2000 && t < 8000) { slowFrames += dt > 1 / 35 ? 1 : 0; fastFrames++; }
+      else if (t >= 8000 && fastFrames && slowFrames / fastFrames > 0.5) gtao.enabled = gtaoWanted = false;
+    }
+  }
+});
+// baked export: the lightmaps already hold the occlusion, so no screen-space AO
+let frames = 0, slowFrames = 0, fastFrames = 0, gtaoWanted = !PHONE && !LIGHT;
+setMode("walk");
+</script>

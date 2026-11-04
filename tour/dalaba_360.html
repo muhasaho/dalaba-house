@@ -1,0 +1,407 @@
+<meta charset="utf-8">
+<title>Dalaba House 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Young+Serif&display=swap">
+<style>
+  /* One committed look: a dark viewing room so the photos carry the colour.
+     Bronze accent after the main door's hardware (same as the walk-through). */
+  :root {
+    --ground: #0f1210;
+    --glass: rgba(15, 18, 16, 0.62);
+    --glass-strong: rgba(15, 18, 16, 0.84);
+    --line: rgba(241, 236, 226, 0.16);
+    --paper: #f1ece2;
+    --muted: #b3ad9f;
+    --accent: #d7a24a;
+    --accent-ink: #1b1508;
+    --plan-room: rgba(241, 236, 226, 0.10);
+    --plan-edge: rgba(241, 236, 226, 0.34);
+    color-scheme: dark;
+    font-family: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  html, body { height: 100%; }
+  body { background: var(--ground); color: var(--paper); overflow: hidden;
+         -webkit-user-select: none; user-select: none; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #stage canvas:active { cursor: grabbing; }
+
+  .glass { background: var(--glass); border: 1px solid var(--line);
+           backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+  /* top: where you are */
+  .top { position: fixed; top: 0; left: 0; right: 0; pointer-events: none;
+         display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+         padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 0; }
+  .top > * { pointer-events: auto; }
+  .where { border-radius: 14px; padding: 10px 14px 11px; min-width: 0; max-width: 62vw; }
+  .kicker { font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+            color: var(--muted); }
+  #roomName { font-family: "Young Serif", Georgia, "Times New Roman", serif; font-weight: 400;
+              font-size: clamp(22px, 4.2vw, 32px); line-height: 1.1; margin: 3px 0 4px;
+              text-wrap: balance; }
+  #meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* plan card */
+  .plan { border-radius: 14px; padding: 8px 10px 10px; width: 244px; }
+  .plan-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+               font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+               color: var(--muted); }
+  .plan-head button { font: inherit; letter-spacing: 0.08em; color: var(--paper);
+                      background: transparent; border: 1px solid var(--line); border-radius: 999px;
+                      padding: 3px 9px; cursor: pointer; }
+  #plan { display: block; width: 100%; height: auto; margin-top: 6px; }
+  #plan .room { fill: var(--plan-room); stroke: var(--plan-edge); stroke-width: 0.06; }
+  #plan .plot { fill: none; stroke: var(--plan-edge); stroke-width: 0.08; stroke-dasharray: 0.35 0.25; }
+  #plan .dot { fill: var(--paper); stroke: var(--ground); stroke-width: 0.12; cursor: pointer; }
+  #plan .dot:hover { fill: var(--accent); }
+  #plan .dot.on { fill: var(--accent); }
+  #plan .cone { fill: var(--accent); opacity: 0.38; }
+  #plan .north { fill: var(--muted); font-size: 0.9px; font-weight: 700; }
+  #roofNote { font-size: 12px; color: var(--accent); margin-top: 4px; }
+
+  /* prev / next */
+  .nav { position: fixed; top: 50%; transform: translateY(-50%); width: 46px; height: 46px;
+         border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+         color: var(--paper); font-size: 20px; line-height: 1; }
+  .nav:hover { border-color: var(--accent); color: var(--accent); }
+  #prev { left: 16px; } #next { right: 16px; }
+
+  /* filmstrip */
+  .strip { position: fixed; left: 0; right: 0; bottom: 0;
+           padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+           background: linear-gradient(to top, rgba(15,18,16,0.92), rgba(15,18,16,0.55) 70%, rgba(15,18,16,0)); }
+  #hint { font-size: 13px; color: var(--paper); border-radius: 999px; padding: 6px 12px;
+          width: max-content; max-width: 100%; margin: 0 auto 10px; }
+  .reel { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+          scroll-snap-type: x proximity; }
+  .reel::-webkit-scrollbar { display: none; }
+  .group { flex: none; display: flex; flex-direction: column; gap: 6px; }
+  .group-label { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+                 color: var(--muted); padding-left: 2px; }
+  .group-items { display: flex; gap: 8px; }
+  .thumb { flex: none; width: 124px; padding: 0; background: transparent; border: 0; cursor: pointer;
+           color: var(--paper); text-align: left; scroll-snap-align: start; font: inherit; }
+  .thumb img { display: block; width: 124px; height: 62px; object-fit: cover; border-radius: 8px;
+               border: 2px solid transparent; background: #1c211d; }
+  .thumb span { display: block; font-size: 12px; font-weight: 500; margin-top: 4px;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumb[aria-current="true"] img { border-color: var(--accent); }
+  .thumb[aria-current="true"] span { color: var(--accent); }
+  .thumb:focus-visible img, .nav:focus-visible, .plan-head button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  #bar { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: var(--accent);
+         z-index: 5; transition: width 200ms ease; }
+  #fail { position: fixed; inset: 0; display: grid; place-items: center; text-align: center;
+          padding-inline: 24px; color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .plan { width: 190px; }
+    .plan.folded #plan, .plan.folded #roofNote { display: none; }
+    .plan.folded { width: auto; }
+    .nav { display: none; }
+    .thumb { width: 100px; } .thumb img { width: 100px; height: 50px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #bar { transition: none; } }
+</style>
+
+<div id="stage"></div>
+<div id="bar" aria-hidden="true"></div>
+
+<div class="top">
+  <div class="where glass" aria-live="polite">
+    <div class="kicker">Dalaba House · 360°</div>
+    <h1 id="roomName">Living room</h1>
+    <div id="meta">Rooms · 1 of 22 · facing north</div>
+  </div>
+  <div class="plan glass" id="planCard">
+    <div class="plan-head"><span>Plan · north up</span><button id="planToggle" aria-expanded="true">Hide</button></div>
+    <svg id="plan" role="group" aria-label="Where each photo was taken"></svg>
+    <div id="roofNote" hidden>Up on the roof</div>
+  </div>
+</div>
+
+<button class="nav glass" id="prev" aria-label="Previous photo">&#8249;</button>
+<button class="nav glass" id="next" aria-label="Next photo">&#8250;</button>
+
+<div class="strip">
+  <div id="hint" class="glass">Drag to look around · pinch or scroll to zoom · arrows switch photos</div>
+  <nav class="reel" id="reel" aria-label="All 360° photos"></nav>
+</div>
+<div id="fail" hidden></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+
+// Photos (from scripts/render.py PANOS): id, label, group, plan x/y (m),
+// floor; every image's centre faces north.  Room outlines for the plan.
+const PANOS = [{"id":"living","label":"Living room","group":"Rooms","x":5.2,"y":7.6,"roof":false,"file":"pano/pano_living.jpg","thumb":"thumbs/pano_living.jpg"},{"id":"nook","label":"Entry nook","group":"Rooms","x":3.2,"y":7.2,"roof":false,"file":"pano/pano_nook.jpg","thumb":"thumbs/pano_nook.jpg"},{"id":"dining","label":"Dining","group":"Rooms","x":9.2,"y":10.0,"roof":false,"file":"pano/pano_dining.jpg","thumb":"thumbs/pano_dining.jpg"},{"id":"kitchen","label":"Kitchen","group":"Rooms","x":10.4,"y":7.6,"roof":false,"file":"pano/pano_kitchen.jpg","thumb":"thumbs/pano_kitchen.jpg"},{"id":"dirtykitchen","label":"Dirty kitchen + pantry","group":"Rooms","x":10.4,"y":5.3,"roof":false,"file":"pano/pano_dirtykitchen.jpg","thumb":"thumbs/pano_dirtykitchen.jpg"},{"id":"masterbed","label":"Master bedroom","group":"Rooms","x":-0.95,"y":3.6,"roof":false,"file":"pano/pano_masterbed.jpg","thumb":"thumbs/pano_masterbed.jpg"},{"id":"masterbath","label":"Master bathroom","group":"Rooms","x":1.2,"y":0.9,"roof":false,"file":"pano/pano_masterbath.jpg","thumb":"thumbs/pano_masterbath.jpg"},{"id":"walkin","label":"Walk-in closet","group":"Rooms","x":1.55,"y":2.8,"roof":false,"file":"pano/pano_walkin.jpg","thumb":"thumbs/pano_walkin.jpg"},{"id":"bedroom2","label":"Bedroom 2","group":"Rooms","x":9.0,"y":2.9,"roof":false,"file":"pano/pano_bedroom2.jpg","thumb":"thumbs/pano_bedroom2.jpg"},{"id":"office","label":"Office / guest","group":"Rooms","x":3.8,"y":2.4,"roof":false,"file":"pano/pano_office.jpg","thumb":"thumbs/pano_office.jpg"},{"id":"guesttoilet","label":"Guest toilet","group":"Rooms","x":7.2,"y":1.75,"roof":false,"file":"pano/pano_guesttoilet.jpg","thumb":"thumbs/pano_guesttoilet.jpg"},{"id":"wc","label":"W/C","group":"Rooms","x":1.45,"y":5.9,"roof":false,"file":"pano/pano_wc.jpg","thumb":"thumbs/pano_wc.jpg"},{"id":"utility","label":"Utility","group":"Rooms","x":1.45,"y":10.2,"roof":false,"file":"pano/pano_utility.jpg","thumb":"thumbs/pano_utility.jpg"},{"id":"store","label":"Store","group":"Rooms","x":5.45,"y":5.9,"roof":false,"file":"pano/pano_store.jpg","thumb":"thumbs/pano_store.jpg"},{"id":"hall","label":"Hall","group":"Circulation","x":3.9,"y":4.5,"roof":false,"file":"pano/pano_hall.jpg","thumb":"thumbs/pano_hall.jpg"},{"id":"lobby","label":"Lobby","group":"Circulation","x":7.45,"y":3.3,"roof":false,"file":"pano/pano_lobby.jpg","thumb":"thumbs/pano_lobby.jpg"},{"id":"corridor","label":"Corridor","group":"Circulation","x":7.35,"y":5.9,"roof":false,"file":"pano/pano_corridor.jpg","thumb":"thumbs/pano_corridor.jpg"},{"id":"porch","label":"Porch","group":"Outside","x":1.3,"y":7.8,"roof":false,"file":"pano/pano_porch.jpg","thumb":"thumbs/pano_porch.jpg"},{"id":"driveway","label":"Driveway","group":"Outside","x":-2.8,"y":12.2,"roof":false,"file":"pano/pano_driveway.jpg","thumb":"thumbs/pano_driveway.jpg"},{"id":"northpath","label":"North path","group":"Outside","x":1.4,"y":12.55,"roof":false,"file":"pano/pano_northpath.jpg","thumb":"thumbs/pano_northpath.jpg"},{"id":"eastyard","label":"East yard","group":"Outside","x":15.5,"y":6.0,"roof":false,"file":"pano/pano_eastyard.jpg","thumb":"thumbs/pano_eastyard.jpg"},{"id":"guardhouse","label":"Guard house","group":"Outside","x":17.3,"y":11.45,"roof":false,"file":"pano/pano_guardhouse.jpg","thumb":"thumbs/pano_guardhouse.jpg"},{"id":"bathhouse","label":"Outdoor bathroom","group":"Outside","x":17.45,"y":-0.2,"roof":false,"file":"pano/pano_bathhouse.jpg","thumb":"thumbs/pano_bathhouse.jpg"},{"id":"roof","label":"Roof","group":"Outside","x":6.0,"y":6.0,"roof":true,"file":"pano/pano_roof.jpg","thumb":"thumbs/pano_roof.jpg"}];
+const PLAN = {"plot":[-5.885,-1.5570000000000002,19.115000000000002,13.443],"rooms":[["Master bathroom",0,0,3.1,1.59],["Walk-in closet",0,1.78,3.11,3.8],["Master bedroom",-4.0,0,-0.19,5.0],["Office / guest",3.29,0,6.61,3.8],["Guest toilet",6.79,0,8.11,2.61],["Lobby",6.79,2.79,8.11,3.8],["Bedroom 2",8.29,0,11.61,3.8],["Hall",-0.19,3.98,8.11,5.0],["Laundry",8.29,3.98,9.0,6.6],["Dirty kitchen + pantry",9.19,3.98,11.61,6.6],["Kitchen",9.19,6.78,11.61,9.0],["Closet",8.29,6.78,9.0,9.0],["Dining",8.1,9.0,11.61,11.5],["Store",4.29,5.18,6.61,6.6],["W/C",0.79,5.18,2.12,6.6],["Utility",0.79,8.99,2.12,11.5],["Porch",0.6,6.78,2.12,8.81],["Foyer",2.3,5.18,4.29,6.78],["Corridor",6.61,5.0,8.11,6.78],["Living room",2.3,6.78,8.11,11.5],["Guard house",16.115,10.943,18.715,13.043],["Outdoor bathroom",16.615,-1.357,18.915,0.943]],"footprint":[[0.6040985599999993,-0.1940291199999986,11.791888319999998,11.6798704],[-4.184667519999997,-0.1940291199999986,0.6040985599999993,5.182831040000002]]};
+
+const DIRS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+const PHONE = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+
+// ---------- renderer / sphere ----------
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PHONE ? 1.5 : 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 100);
+camera.rotation.order = "YXZ";
+const geo = new THREE.SphereGeometry(40, 72, 36).scale(-1, 1, 1);
+function sphere() {
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 1,
+                                                              depthWrite: false }));
+  m.rotation.y = -Math.PI / 2;           // image centre faces north (-z)
+  scene.add(m);
+  return m;
+}
+let front = sphere(), back = sphere();
+back.visible = false;
+back.renderOrder = 1;
+
+// ---------- view state (yaw 0 = north, positive turns left) ----------
+const view = { yaw: 0, pitch: 0, fov: 72, vyaw: 0, vpitch: 0 };
+function bearing() {
+  const b = Math.atan2(-Math.sin(view.yaw), Math.cos(view.yaw)) * 180 / Math.PI;
+  return (b + 360) % 360;
+}
+
+// ---------- photos ----------
+let idx = 0, loading = 0, fade = null;
+const loader = new THREE.TextureLoader();
+function setBar(p) { $("bar").style.width = p + "%"; }
+function show(i, opts = {}) {
+  idx = (i + PANOS.length) % PANOS.length;
+  const p = PANOS[idx];
+  const token = ++loading;
+  setBar(20);
+  updateLabels();
+  loader.load(p.file, (tex) => {
+    if (token !== loading) { tex.dispose(); return; }
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    if (PHONE) { tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; }
+    back.material.map = tex;
+    back.material.opacity = front.material.map && !REDUCED ? 0 : 1;
+    back.material.needsUpdate = true;
+    back.visible = true;
+    fade = { t0: performance.now(), dur: front.material.map && !REDUCED ? 320 : 0 };
+    setBar(100);
+    setTimeout(() => setBar(0), 350);
+    prefetch(idx + 1);
+  }, undefined, () => {
+    if (token !== loading) return;
+    setBar(0);
+    $("meta").textContent = "This photo didn't load. Pick it again to retry.";
+  });
+  try { history.replaceState(null, "", "#" + p.id); } catch (e) { /* frame may refuse */ }
+  try { localStorage.setItem("dalaba360.last", p.id); } catch (e) { /* optional */ }
+}
+function finishFade() {
+  const old = front.material.map;
+  [front, back] = [back, front];
+  front.renderOrder = 0; back.renderOrder = 1;
+  back.visible = false;
+  if (old && old !== front.material.map) old.dispose();
+  back.material.map = null;
+  front.material.opacity = 1;
+  fade = null;
+}
+const warmed = new Set();
+function prefetch(i) {              // warm the browser cache for the next photo
+  const p = PANOS[(i + PANOS.length) % PANOS.length];
+  if (warmed.has(p.file)) return;
+  warmed.add(p.file);
+  fetch(p.file).catch(() => warmed.delete(p.file));
+}
+
+// ---------- labels, filmstrip, plan ----------
+function updateLabels() {
+  const p = PANOS[idx];
+  $("roomName").textContent = p.label;
+  $("meta").textContent = `${p.group} · ${idx + 1} of ${PANOS.length} · facing ${DIRS[Math.round(bearing() / 45) % 8]}`;
+  for (const b of $("reel").querySelectorAll(".thumb")) {
+    const on = b.dataset.i === String(idx);
+    b.setAttribute("aria-current", on ? "true" : "false");
+    if (on) b.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", inline: "center", block: "nearest" });
+  }
+  for (const d of $("plan").querySelectorAll(".dot"))
+    d.classList.toggle("on", d.dataset.i === String(idx));
+  $("roofNote").hidden = !p.roof;
+  $("cone").style.display = p.roof ? "none" : "";
+}
+function buildReel() {
+  const reel = $("reel");
+  const groups = [...new Set(PANOS.map((p) => p.group))];
+  for (const g of groups) {
+    const box = document.createElement("div");
+    box.className = "group";
+    box.innerHTML = `<div class="group-label">${g}</div><div class="group-items"></div>`;
+    const items = box.querySelector(".group-items");
+    PANOS.forEach((p, i) => {
+      if (p.group !== g) return;
+      const b = document.createElement("button");
+      b.className = "thumb"; b.dataset.i = i;
+      b.innerHTML = `<img src="${p.thumb}" alt="" loading="lazy"><span>${p.label}</span>`;
+      b.addEventListener("click", () => show(i));
+      items.appendChild(b);
+    });
+    reel.appendChild(box);
+  }
+}
+const SVG = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVG, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+}
+function buildPlan() {
+  const svg = $("plan");
+  const [x0, y0, x1, y1] = PLAN.plot;
+  const pad = 0.8;
+  // plan metres -> svg: x east, y flipped so north is up
+  svg.setAttribute("viewBox", `${x0 - pad} ${-(y1 + pad)} ${x1 - x0 + 2 * pad} ${y1 - y0 + 2 * pad}`);
+  el("rect", { class: "plot", x: x0, y: -y1, width: x1 - x0, height: y1 - y0 }, svg);
+  for (const [, a, b, c, d] of PLAN.rooms)
+    el("rect", { class: "room", x: a, y: -d, width: c - a, height: d - b }, svg);
+  const t = el("text", { class: "north", x: x1 - 0.2, y: -(y1 - 0.9), "text-anchor": "end" }, svg);
+  t.textContent = "N ↑";
+  const cone = el("path", { id: "cone", class: "cone" }, svg);
+  PANOS.forEach((p, i) => {
+    if (p.roof) return;                 // the roof photo lives in the filmstrip
+    const d = el("circle", { class: "dot", cx: p.x, cy: -p.y, r: 0.42, "data-i": i,
+                             tabindex: -1 }, svg);
+    const tt = el("title", {}, d); tt.textContent = p.label;
+    d.addEventListener("click", () => show(i));
+  });
+}
+function updateCone() {
+  const p = PANOS[idx];
+  if (p.roof) return;
+  const half = (view.fov * camera.aspect) / 2 * Math.PI / 180;    // horizontal half-angle
+  const b = bearing() * Math.PI / 180, r = 2.6;
+  const pt = (a) => `${p.x + r * Math.sin(a)} ${-(p.y + r * Math.cos(a))}`;
+  const h = Math.min(half, 1.2);
+  $("cone").setAttribute("d", `M ${p.x} ${-p.y} L ${pt(b - h)} A ${r} ${r} 0 0 1 ${pt(b + h)} Z`);
+}
+
+// ---------- input ----------
+const canvas = renderer.domElement;
+const pts = new Map();
+let pinch0 = null;
+function dismissHint() { $("hint").hidden = true; }
+canvas.addEventListener("pointerdown", (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  view.vyaw = view.vpitch = 0;
+  if (pts.size === 2) {
+    const [a, b] = [...pts.values()];
+    pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y), fov: view.fov };
+  }
+});
+canvas.addEventListener("pointermove", (e) => {
+  const prev = pts.get(e.pointerId);
+  if (!prev) return;
+  const cur = { x: e.clientX, y: e.clientY };
+  pts.set(e.pointerId, cur);
+  if (pts.size === 2 && pinch0) {
+    const [a, b] = [...pts.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    view.fov = Math.max(35, Math.min(95, pinch0.fov * pinch0.d / Math.max(20, d)));
+  } else if (pts.size === 1) {
+    // drag the picture: angle per pixel follows the zoom
+    const k = (view.fov * Math.PI / 180) / canvas.clientHeight;
+    const dx = (cur.x - prev.x) * k, dy = (cur.y - prev.y) * k;
+    view.yaw += dx; view.pitch = Math.max(-1.45, Math.min(1.45, view.pitch + dy));
+    view.vyaw = dx; view.vpitch = dy;
+  }
+  dismissHint();
+});
+function endPtr(e) {
+  pts.delete(e.pointerId);
+  if (pts.size < 2) pinch0 = null;
+  if (REDUCED) view.vyaw = view.vpitch = 0;
+}
+canvas.addEventListener("pointerup", endPtr);
+canvas.addEventListener("pointercancel", endPtr);
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  view.fov = Math.max(35, Math.min(95, view.fov + e.deltaY * 0.04));
+  dismissHint();
+}, { passive: false });
+const keys = new Set();
+addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === "]") { show(idx + 1); e.preventDefault(); }
+  else if (e.key === "ArrowLeft" || e.key === "PageUp" || e.key === "[") { show(idx - 1); e.preventDefault(); }
+  else if (["a", "d", "w", "s", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(e.key)) { keys.add(e.key); dismissHint(); }
+});
+addEventListener("keyup", (e) => keys.delete(e.key));
+$("prev").addEventListener("click", () => show(idx - 1));
+$("next").addEventListener("click", () => show(idx + 1));
+$("planToggle").addEventListener("click", () => {
+  const card = $("planCard");
+  const folded = card.classList.toggle("folded");
+  $("plan").style.display = folded ? "none" : "";
+  $("planToggle").textContent = folded ? "Show" : "Hide";
+  $("planToggle").setAttribute("aria-expanded", String(!folded));
+});
+
+// ---------- loop ----------
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+let lastLabel = "", lastT = performance.now();
+renderer.setAnimationLoop(() => {
+  const now = performance.now(), dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  if (keys.has("a")) view.yaw += 1.4 * dt;
+  if (keys.has("d")) view.yaw -= 1.4 * dt;
+  if (keys.has("w") || keys.has("ArrowUp")) view.pitch = Math.min(1.45, view.pitch + dt);
+  if (keys.has("s") || keys.has("ArrowDown")) view.pitch = Math.max(-1.45, view.pitch - dt);
+  if (keys.has("+") || keys.has("=")) view.fov = Math.max(35, view.fov - 40 * dt);
+  if (keys.has("-")) view.fov = Math.min(95, view.fov + 40 * dt);
+  if (!pts.size && (Math.abs(view.vyaw) > 1e-4 || Math.abs(view.vpitch) > 1e-4)) {
+    view.yaw += view.vyaw; view.pitch = Math.max(-1.45, Math.min(1.45, view.pitch + view.vpitch));
+    view.vyaw *= 0.92; view.vpitch *= 0.92;
+  }
+  if (camera.fov !== view.fov) { camera.fov = view.fov; camera.updateProjectionMatrix(); }
+  camera.rotation.set(view.pitch, view.yaw, 0);
+  if (fade) {
+    const k = fade.dur ? Math.min(1, (now - fade.t0) / fade.dur) : 1;
+    back.material.opacity = k;
+    if (k >= 1) finishFade();
+  }
+  const label = DIRS[Math.round(bearing() / 45) % 8];
+  if (label !== lastLabel) { lastLabel = label; updateLabels(); }
+  updateCone();
+  renderer.render(scene, camera);
+});
+
+// ---------- start ----------
+buildReel();
+buildPlan();
+if (PHONE && innerWidth <= 720) $("planToggle").click();     // folded on phones
+let start = 0;
+const want = (location.hash || "").slice(1);
+let last = null;
+try { last = localStorage.getItem("dalaba360.last"); } catch (e) { /* optional */ }
+const pick = PANOS.findIndex((p) => p.id === want) >= 0 ? want : last;
+if (pick) start = Math.max(0, PANOS.findIndex((p) => p.id === pick));
+show(start);
+</script>

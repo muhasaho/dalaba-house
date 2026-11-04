@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dalaba House</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#f4f1ec;--ink:#24211d;--muted:#766d62;--card:#fffdf9;--line:#e2dacf;--accent:#a8782c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+header{max-width:1180px;margin:0 auto;padding:40px 20px 8px}
+h1{font-size:30px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:4px 0 0}
+main{max-width:1180px;margin:0 auto;padding:12px 20px 60px}
+.heroes{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin:22px 0 34px}
+@media (max-width:760px){.heroes{grid-template-columns:1fr}}
+.hero{display:block;position:relative;border-radius:14px;overflow:hidden;text-decoration:none;color:#fff;background:#222}
+.hero img{width:100%;height:100%;display:block;aspect-ratio:16/9;object-fit:cover;opacity:.88}
+.hero .cta{position:absolute;left:22px;bottom:20px;right:22px}
+.hero .cta b{display:block;font-size:23px;line-height:1.2;text-shadow:0 1px 8px rgba(0,0,0,.55)}
+.hero .cta span{display:inline-block;margin-top:10px;background:var(--accent);padding:9px 18px;border-radius:999px;font-weight:600}
+.hero.small .cta b{font-size:19px}
+h2{font-size:19px;margin:30px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.grid a{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;text-decoration:none;color:var(--ink)}
+.grid img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
+.grid .cap{padding:8px 11px;font-size:14px}
+footer{color:var(--muted);font-size:13px;text-align:center;padding:0 20px 30px}
+#lb{position:fixed;inset:0;background:rgba(20,16,12,.94);display:none;align-items:center;justify-content:center;z-index:9}
+#lb.on{display:flex}
+#lb img{max-width:96vw;max-height:86vh;border-radius:6px}
+#lb .t{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:#f1e9df}
+#lb button{position:absolute;top:50%;transform:translateY(-50%);background:none;border:0;color:#fff;font-size:44px;padding:20px;cursor:pointer}
+#lb .p{left:4px} #lb .n{right:4px}
+#lb .x{top:14px;right:8px;transform:none;font-size:34px}
+</style>
+</head>
+<body>
+<header>
+<h1>Dalaba House</h1>
+<p class="sub">The Gambia · design visualisation · updated 4 November 2026</p>
+</header>
+<main>
+<div class="heroes">
+<a class="hero" href="walkthrough/">
+<img src="renders/Street_Gate.jpg" alt="">
+<div class="cta"><b>Walk through the house in 3D</b><span>Open the walk-through →</span></div>
+</a>
+<a class="hero small" href="tour/"><img src="renders/thumbs/Living.jpg" alt=""><div class="cta"><b>360° photos of every room</b><span>Open the 360° tour →</span></div></a>
+</div>
+<h2>Outside</h2>
+<div class="grid">
+<a href="renders/Street_Gate.jpg" data-cap="Street and vehicle gate"><img loading="lazy" src="renders/thumbs/Street_Gate.jpg" alt="Street and vehicle gate"><div class="cap">Street and vehicle gate</div></a>
+<a href="renders/Street_Fence.jpg" data-cap="Street fence"><img loading="lazy" src="renders/thumbs/Street_Fence.jpg" alt="Street fence"><div class="cap">Street fence</div></a>
+<a href="renders/Ped_Gate.jpg" data-cap="Pedestrian gate"><img loading="lazy" src="renders/thumbs/Ped_Gate.jpg" alt="Pedestrian gate"><div class="cap">Pedestrian gate</div></a>
+<a href="renders/Carport.jpg" data-cap="Carport"><img loading="lazy" src="renders/thumbs/Carport.jpg" alt="Carport"><div class="cap">Carport</div></a>
+<a href="renders/Carport_Gap.jpg" data-cap="Carport from the vehicle gate"><img loading="lazy" src="renders/thumbs/Carport_Gap.jpg" alt="Carport from the vehicle gate"><div class="cap">Carport from the vehicle gate</div></a>
+<a href="renders/Entrance.jpg" data-cap="Entrance porch"><img loading="lazy" src="renders/thumbs/Entrance.jpg" alt="Entrance porch"><div class="cap">Entrance porch</div></a>
+<a href="renders/Yard.jpg" data-cap="North yard"><img loading="lazy" src="renders/thumbs/Yard.jpg" alt="North yard"><div class="cap">North yard</div></a>
+<a href="renders/North_Side.jpg" data-cap="North side path"><img loading="lazy" src="renders/thumbs/North_Side.jpg" alt="North side path"><div class="cap">North side path</div></a>
+<a href="renders/North_Bed.jpg" data-cap="North planting bed"><img loading="lazy" src="renders/thumbs/North_Bed.jpg" alt="North planting bed"><div class="cap">North planting bed</div></a>
+<a href="renders/East_Bed.jpg" data-cap="East yard and planting"><img loading="lazy" src="renders/thumbs/East_Bed.jpg" alt="East yard and planting"><div class="cap">East yard and planting</div></a>
+<a href="renders/Stairs.jpg" data-cap="Roof stair"><img loading="lazy" src="renders/thumbs/Stairs.jpg" alt="Roof stair"><div class="cap">Roof stair</div></a>
+<a href="renders/South_Side.jpg" data-cap="South side"><img loading="lazy" src="renders/thumbs/South_Side.jpg" alt="South side"><div class="cap">South side</div></a>
+<a href="renders/GuardHouse.jpg" data-cap="Guard house"><img loading="lazy" src="renders/thumbs/GuardHouse.jpg" alt="Guard house"><div class="cap">Guard house</div></a>
+<a href="renders/GuardHouse_Door.jpg" data-cap="Guard house door"><img loading="lazy" src="renders/thumbs/GuardHouse_Door.jpg" alt="Guard house door"><div class="cap">Guard house door</div></a>
+<a href="renders/Bathhouse.jpg" data-cap="Outdoor bathroom"><img loading="lazy" src="renders/thumbs/Bathhouse.jpg" alt="Outdoor bathroom"><div class="cap">Outdoor bathroom</div></a>
+<a href="renders/Roof.jpg" data-cap="Roof deck"><img loading="lazy" src="renders/thumbs/Roof.jpg" alt="Roof deck"><div class="cap">Roof deck</div></a>
+<a href="renders/Overview_Roof.jpg" data-cap="Aerial view"><img loading="lazy" src="renders/thumbs/Overview_Roof.jpg" alt="Aerial view"><div class="cap">Aerial view</div></a>
+<a href="renders/Solar_Overview.jpg" data-cap="Solar, aerial view"><img loading="lazy" src="renders/thumbs/Solar_Overview.jpg" alt="Solar, aerial view"><div class="cap">Solar, aerial view</div></a>
+<a href="renders/Solar_Roof.jpg" data-cap="Solar on the roof"><img loading="lazy" src="renders/thumbs/Solar_Roof.jpg" alt="Solar on the roof"><div class="cap">Solar on the roof</div></a>
+<a href="renders/Plan.jpg" data-cap="Plan view"><img loading="lazy" src="renders/thumbs/Plan.jpg" alt="Plan view"><div class="cap">Plan view</div></a>
+</div>
+<h2>Inside</h2>
+<div class="grid">
+<a href="renders/Living.jpg" data-cap="Living room"><img loading="lazy" src="renders/thumbs/Living.jpg" alt="Living room"><div class="cap">Living room</div></a>
+<a href="renders/Living_B.jpg" data-cap="Living room, from the nook"><img loading="lazy" src="renders/thumbs/Living_B.jpg" alt="Living room, from the nook"><div class="cap">Living room, from the nook</div></a>
+<a href="renders/Living_Nook.jpg" data-cap="Entry nook"><img loading="lazy" src="renders/thumbs/Living_Nook.jpg" alt="Entry nook"><div class="cap">Entry nook</div></a>
+<a href="renders/Hall.jpg" data-cap="Living room to the hall"><img loading="lazy" src="renders/thumbs/Hall.jpg" alt="Living room to the hall"><div class="cap">Living room to the hall</div></a>
+<a href="renders/Dining.jpg" data-cap="Dining"><img loading="lazy" src="renders/thumbs/Dining.jpg" alt="Dining"><div class="cap">Dining</div></a>
+<a href="renders/Dining_B.jpg" data-cap="Dining, towards the kitchen"><img loading="lazy" src="renders/thumbs/Dining_B.jpg" alt="Dining, towards the kitchen"><div class="cap">Dining, towards the kitchen</div></a>
+<a href="renders/Kitchen.jpg" data-cap="Kitchen"><img loading="lazy" src="renders/thumbs/Kitchen.jpg" alt="Kitchen"><div class="cap">Kitchen</div></a>
+<a href="renders/Kitchen_B.jpg" data-cap="Kitchen, from the dining"><img loading="lazy" src="renders/thumbs/Kitchen_B.jpg" alt="Kitchen, from the dining"><div class="cap">Kitchen, from the dining</div></a>
+<a href="renders/Kitchen_NE.jpg" data-cap="Kitchen, north-east"><img loading="lazy" src="renders/thumbs/Kitchen_NE.jpg" alt="Kitchen, north-east"><div class="cap">Kitchen, north-east</div></a>
+<a href="renders/Kitchen_NW.jpg" data-cap="Kitchen, north-west"><img loading="lazy" src="renders/thumbs/Kitchen_NW.jpg" alt="Kitchen, north-west"><div class="cap">Kitchen, north-west</div></a>
+<a href="renders/DirtyKitchen.jpg" data-cap="Dirty kitchen + pantry"><img loading="lazy" src="renders/thumbs/DirtyKitchen.jpg" alt="Dirty kitchen + pantry"><div class="cap">Dirty kitchen + pantry</div></a>
+<a href="renders/DirtyKitchen_B.jpg" data-cap="Dirty kitchen"><img loading="lazy" src="renders/thumbs/DirtyKitchen_B.jpg" alt="Dirty kitchen"><div class="cap">Dirty kitchen</div></a>
+<a href="renders/MasterBed.jpg" data-cap="Master bedroom"><img loading="lazy" src="renders/thumbs/MasterBed.jpg" alt="Master bedroom"><div class="cap">Master bedroom</div></a>
+<a href="renders/MasterBed_B.jpg" data-cap="Master bedroom, towards the bed"><img loading="lazy" src="renders/thumbs/MasterBed_B.jpg" alt="Master bedroom, towards the bed"><div class="cap">Master bedroom, towards the bed</div></a>
+<a href="renders/MasterBed_C.jpg" data-cap="Master bedroom, from the bath"><img loading="lazy" src="renders/thumbs/MasterBed_C.jpg" alt="Master bedroom, from the bath"><div class="cap">Master bedroom, from the bath</div></a>
+<a href="renders/MasterBed_Barn.jpg" data-cap="Master bedroom, barn door"><img loading="lazy" src="renders/thumbs/MasterBed_Barn.jpg" alt="Master bedroom, barn door"><div class="cap">Master bedroom, barn door</div></a>
+<a href="renders/MasterBath_A.jpg" data-cap="Master bathroom"><img loading="lazy" src="renders/thumbs/MasterBath_A.jpg" alt="Master bathroom"><div class="cap">Master bathroom</div></a>
+<a href="renders/MasterBath_B.jpg" data-cap="Master bathroom, vanity"><img loading="lazy" src="renders/thumbs/MasterBath_B.jpg" alt="Master bathroom, vanity"><div class="cap">Master bathroom, vanity</div></a>
+<a href="renders/WalkIn.jpg" data-cap="Walk-in closet"><img loading="lazy" src="renders/thumbs/WalkIn.jpg" alt="Walk-in closet"><div class="cap">Walk-in closet</div></a>
+<a href="renders/WalkIn_B.jpg" data-cap="Walk-in closet, east"><img loading="lazy" src="renders/thumbs/WalkIn_B.jpg" alt="Walk-in closet, east"><div class="cap">Walk-in closet, east</div></a>
+<a href="renders/Bedroom2.jpg" data-cap="Bedroom 2"><img loading="lazy" src="renders/thumbs/Bedroom2.jpg" alt="Bedroom 2"><div class="cap">Bedroom 2</div></a>
+<a href="renders/Bedroom2_B.jpg" data-cap="Bedroom 2, towards the door"><img loading="lazy" src="renders/thumbs/Bedroom2_B.jpg" alt="Bedroom 2, towards the door"><div class="cap">Bedroom 2, towards the door</div></a>
+<a href="renders/Office.jpg" data-cap="Office / guest room"><img loading="lazy" src="renders/thumbs/Office.jpg" alt="Office / guest room"><div class="cap">Office / guest room</div></a>
+<a href="renders/Office_B.jpg" data-cap="Office, towards the closet"><img loading="lazy" src="renders/thumbs/Office_B.jpg" alt="Office, towards the closet"><div class="cap">Office, towards the closet</div></a>
+<a href="renders/GuestToilet.jpg" data-cap="Guest toilet"><img loading="lazy" src="renders/thumbs/GuestToilet.jpg" alt="Guest toilet"><div class="cap">Guest toilet</div></a>
+<a href="renders/GuestToilet_B.jpg" data-cap="Guest toilet, vanity"><img loading="lazy" src="renders/thumbs/GuestToilet_B.jpg" alt="Guest toilet, vanity"><div class="cap">Guest toilet, vanity</div></a>
+<a href="renders/WC.jpg" data-cap="W/C"><img loading="lazy" src="renders/thumbs/WC.jpg" alt="W/C"><div class="cap">W/C</div></a>
+<a href="renders/Utility.jpg" data-cap="Utility"><img loading="lazy" src="renders/thumbs/Utility.jpg" alt="Utility"><div class="cap">Utility</div></a>
+<a href="renders/Utility_Drain.jpg" data-cap="Utility floor drain"><img loading="lazy" src="renders/thumbs/Utility_Drain.jpg" alt="Utility floor drain"><div class="cap">Utility floor drain</div></a>
+<a href="renders/Store.jpg" data-cap="Store"><img loading="lazy" src="renders/thumbs/Store.jpg" alt="Store"><div class="cap">Store</div></a>
+<a href="renders/GuardHouse_In.jpg" data-cap="Guard house, inside"><img loading="lazy" src="renders/thumbs/GuardHouse_In.jpg" alt="Guard house, inside"><div class="cap">Guard house, inside</div></a>
+<a href="renders/Bathhouse_In.jpg" data-cap="Outdoor bathroom, inside"><img loading="lazy" src="renders/thumbs/Bathhouse_In.jpg" alt="Outdoor bathroom, inside"><div class="cap">Outdoor bathroom, inside</div></a>
+</div>
+<h2>Evening</h2>
+<div class="grid">
+<a href="renders/Evening_Street_Gate.jpg" data-cap="Street and vehicle gate, evening"><img loading="lazy" src="renders/thumbs/Evening_Street_Gate.jpg" alt="Street and vehicle gate, evening"><div class="cap">Street and vehicle gate, evening</div></a>
+<a href="renders/Evening_Ped_Gate.jpg" data-cap="Pedestrian gate, evening"><img loading="lazy" src="renders/thumbs/Evening_Ped_Gate.jpg" alt="Pedestrian gate, evening"><div class="cap">Pedestrian gate, evening</div></a>
+<a href="renders/Evening_Entrance.jpg" data-cap="Entrance porch, evening"><img loading="lazy" src="renders/thumbs/Evening_Entrance.jpg" alt="Entrance porch, evening"><div class="cap">Entrance porch, evening</div></a>
+<a href="renders/Evening_Yard.jpg" data-cap="North yard, evening"><img loading="lazy" src="renders/thumbs/Evening_Yard.jpg" alt="North yard, evening"><div class="cap">North yard, evening</div></a>
+<a href="renders/Evening_North_Bed.jpg" data-cap="North planting bed, evening"><img loading="lazy" src="renders/thumbs/Evening_North_Bed.jpg" alt="North planting bed, evening"><div class="cap">North planting bed, evening</div></a>
+<a href="renders/Evening_Stairs.jpg" data-cap="Roof stair, evening"><img loading="lazy" src="renders/thumbs/Evening_Stairs.jpg" alt="Roof stair, evening"><div class="cap">Roof stair, evening</div></a>
+</div>
+</main>
+<footer>Renders, walk-through and 360 photos are design visualisations, not construction drawings.</footer>
+<div id="lb"><button class="x" aria-label="Close">×</button><button class="p" aria-label="Previous">‹</button><img alt=""><button class="n" aria-label="Next">›</button><div class="t"></div></div>
+<script>
+const items=[...document.querySelectorAll('.grid a')];
+const lb=document.getElementById('lb'),im=lb.querySelector('img'),tt=lb.querySelector('.t');
+let i=0;
+function show(k){i=(k+items.length)%items.length;im.src=items[i].href;tt.textContent=items[i].dataset.cap;lb.classList.add('on')}
+items.forEach((a,k)=>a.addEventListener('click',e=>{e.preventDefault();show(k)}));
+lb.querySelector('.p').onclick=e=>{e.stopPropagation();show(i-1)};
+lb.querySelector('.n').onclick=e=>{e.stopPropagation();show(i+1)};
+lb.querySelector('.x').onclick=()=>lb.classList.remove('on');
+lb.addEventListener('click',e=>{if(e.target===lb)lb.classList.remove('on')});
+document.addEventListener('keydown',e=>{if(!lb.classList.contains('on'))return;
+if(e.key==='Escape')lb.classList.remove('on');if(e.key==='ArrowLeft')show(i-1);if(e.key==='ArrowRight')show(i+1)});
+</script>
+</body>
+</html>
