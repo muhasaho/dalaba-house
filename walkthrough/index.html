@@ -252,6 +252,21 @@ try {
 // half-float buffers, 4x MSAA copies and AO targets ran iPhones out of GPU
 // memory), a smaller shadow map, lower pixel ratio, one 360 photo in memory.
 const PHONE = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
+
+// This PowerVR driver (Pixel 10: "PowerVR D-Series DXT-48-1536") crashes the
+// GPU process on the one-element sun-shadow sampler array three r170 declares.
+// The walkthrough has one shadow-casting directional light (the sun): keep the
+// PCF shader and texture, but expose its sampler as a scalar on PowerVR phones.
+const gl = renderer.getContext();
+const gpuInfo = gl.getExtension("WEBGL_debug_renderer_info");
+// (?pvr=1 forces the workaround anywhere, to check that every shader compiles)
+const POWERVR = (PHONE && gpuInfo && /PowerVR/i.test(gl.getParameter(gpuInfo.UNMASKED_RENDERER_WEBGL))) ||
+  new URLSearchParams(location.search).get("pvr") === "1";
+if (POWERVR) for (const k of ["shadowmap_pars_fragment", "lights_fragment_begin", "shadowmask_pars_fragment"]) {
+  THREE.ShaderChunk[k] = THREE.ShaderChunk[k]
+    .replace("directionalShadowMap[ NUM_DIR_LIGHT_SHADOWS ]", "directionalShadowMap")
+    .replace(/directionalShadowMap\[ i \]/g, "directionalShadowMap");
+}
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PHONE ? 1.5 : 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 // AgX, the renders' view transform, with Blender's "Medium High Contrast"
@@ -518,7 +533,7 @@ function setupMirrors(root) {
     // the box projection's warps)
     F_Steel_Brushed: [0.35, 0.35, 8.0], Brushed_Steel: [0.3, 0.3, 8.0],
     // sink bowls: the steel mirrors the basin's own dark walls in Cycles
-    F_Steel_Sink: [0.06, 0.06, 6.0],
+    F_Steel_Sink: [0.015, 0.015, 8.0],
     // the polished floor tiles (Cycles roughness ~0.12-0.6): at a corridor's
     // grazing angles they mirror the walls instead of showing their own pale
     // grey - mixed in by Fresnel, not added
@@ -1271,7 +1286,8 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
       withTint(sh);
     };
     const pv = m.name === "Solar_PV_Cells";
-    b.customProgramCacheKey = () => (lm.sun ? "baked_sun_" + (lm.encoding || "") : "baked") + (pv ? "_pv" : "");
+    // (rooms and outside compile different code: the rooms' default tint)
+    b.customProgramCacheKey = () => (lm.sun ? "baked_sun_" + (lm.encoding || "") : "baked") + (pv ? "_pv" : "") + (lm.interior ? "_in" : "");
     if (pv && !PHONE) {
       b.roughness = 0.08; b.envMapIntensity = LIGHT && LIGHT.sky_intensity ? LIGHT.sky_intensity : 1;
       skyOnly.mats.push(b); if (skyOnly.tex) b.envMap = skyOnly.tex;
@@ -1341,7 +1357,9 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
     const o = m.clone();
     o.vertexColors = true;
     o.userData.vlK = info.intensity;
-    const K = info.intensity.toFixed(5);
+    // fluted walnut: every vertex sits in a groove, so its per-vertex light
+    // is the grooves' (the coffee table's drum went near black)
+    const K = (info.intensity * ({ F_Walnut_Fluted: 2.5, F_Walnut_Set_Fluted: 1.6 }[m.name] || 1)).toFixed(5);
     const begin = THREE.ShaderChunk.lights_fragment_begin
       .replace("vec3 irradiance = getAmbientLightIrradiance( ambientLightColor );",
         `vec3 vlE = min( vColor.rgb, vec3( 0.996 ) );\n\tvec3 irradiance = vlE / ( 1.0 - vlE ) * ${K};`)
@@ -1354,10 +1372,19 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
 #endif`;
     // leaves pass sunlight through: the side away from the sun gets some of
     // it (their backs went near black)
+    // (diffuse only: added to the specular too it made white glints along
+    // stems and leaf edges)
     const LEAF = THREE.ShaderChunk.lights_physical_pars_fragment.replace(
-      "float dotNL = saturate( dot( geometryNormal, directLight.direction ) );",
-      "float dotNL = saturate( dot( geometryNormal, directLight.direction ) ) + 0.35 * saturate( -dot( geometryNormal, directLight.direction ) );");
+      "reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );",
+      "reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );\n\treflectedLight.directDiffuse += 0.35 * saturate( -dot( geometryNormal, directLight.direction ) ) * directLight.color * BRDF_Lambert( material.diffuseColor );");
+    // fabrics: Cycles' sheen (0.3-0.6) is a white grazing-angle layer that
+    // lifts dark upholstery a lot; MeshStandard has none
+    const SHEEN = { F_Fabric_DustyBlue: 0.5, F_Chenille_Blue: 0.3, F_Boucle_Brown: 0.3,
+      F_Fabric_Cream: 0.5, F_Linen_White: 0.6, F_Fabric_Grey: 0.5 }[m.name] || 0;
     o.onBeforeCompile = (sh) => {
+      if (SHEEN) sh.fragmentShader = sh.fragmentShader
+        .replace("#include <lights_fragment_begin>", "#include <lights_fragment_begin>\n\tvec3 sheenAdd = " + SHEEN.toFixed(2) + " * 0.5 * pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 2.0 ) * irradiance / 3.14159;")
+        .replace("#include <opaque_fragment>", "outgoingLight += sheenAdd;\n\t#include <opaque_fragment>");
       if (info.leaves) sh.fragmentShader = sh.fragmentShader.replace("#include <lights_physical_pars_fragment>", LEAF);
       sh.fragmentShader = sh.fragmentShader
         .replace("#include <color_fragment>", "")
@@ -1366,9 +1393,10 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
         .replace("#include <lights_fragment_maps>", vmaps);
       withTint(sh);
     };
-    o.customProgramCacheKey = () => "vertex_lit" + (info.interior ? "_in" : "") + (info.leaves ? "_leaf" : "");
-    // leaves are cards seen from both sides
-    if (info.leaves) o.side = THREE.DoubleSide;
+    o.customProgramCacheKey = () => "vertex_lit" + K + (info.interior ? "_in" : "") + (info.leaves ? "_leaf" : "") + (SHEEN ? "_sh" + SHEEN : "");
+    // leaves are cards seen from both sides; matte (glossier, thin stems
+    // and leaf edges caught the sun as white glints)
+    if (info.leaves) { o.side = THREE.DoubleSide; o.roughness = Math.max(o.roughness, 0.85); }
     // outdoors reflect the yard (probe); rooms their own environment
     if (!info.interior) { o.envMapIntensity = ENV_I; skyEnvMats.push(o); if (skyEnv) o.envMap = skyEnv; }
     else { o.envMap = scene.environment; o.envMapIntensity = ROOM_ENV_I; }
@@ -1482,6 +1510,20 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
   // on the first frames, before the model was in)
   panesInside = null;
   for (const m of allMats) {
+    // PowerVR: the scalar sun-shadow sampler gets the sun's shadow texture
+    // through a getter (WebGLLights keeps assigning an array to the uniform).
+    // Every material with its own onBeforeCompile also sets its own
+    // customProgramCacheKey, so wrapping them keeps their programs apart.
+    if (POWERVR && !m.userData.scalarSunShadow) {
+      m.userData.scalarSunShadow = true;
+      const compile = m.onBeforeCompile;
+      m.onBeforeCompile = function (sh, r) {
+        compile.call(this, sh, r);
+        if (sh.uniforms.directionalShadowMap) Object.defineProperty(sh.uniforms.directionalShadowMap, "value", {
+          get: () => sun.shadow.map?.texture, set: () => {}, configurable: true
+        });
+      };
+    }
     if (m.transparent) m.depthWrite = false;
     // window panes reflect the sky / yard; shower screens and car glass don't
     if (LIGHT && LIGHT.sky && m.transparent && /glass_window|glass_lowe/i.test(m.name) && !m.userData.sky) {
@@ -1541,6 +1583,8 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
   await Promise.all([...Object.values(texCache), ...Object.values(lmCache).map((t) =>
     new Promise((ok) => { const c = () => (t.image ? ok() : setTimeout(c, 100)); c(); }))]);
   if (SHOT) { window.DALABA_SCENE = scene; window.DALABA_CAMERA = camera; window.DALABA_THREE = THREE; }
+  // ?test=1: handles for device tests (phone GPU checks)
+  if (new URLSearchParams(location.search).get("test") === "1") window.DALABA_TEST = { renderer, scene, sun, camera, POWERVR, THREE };
   // ?debug=class: baked = green, outdoor open-sky = blue, indoor fill = red
   // ?debug=light: textures off (white), to see the light alone
   const DEBUG = new URLSearchParams(location.search).get("debug");
