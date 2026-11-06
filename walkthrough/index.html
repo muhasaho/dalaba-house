@@ -259,13 +259,17 @@ try {
 // on every full load and cleared once it has rendered for a while or the page
 // is left normally, so a mark still there on the next load means it died.
 // ?full=1 / ?phone=1 force either version (?full=1 also clears the marks).
+// every asset URL carries the build stamp: GitHub Pages' CDN and browsers
+// cache them for 10 minutes, and a new model with an old cached lightmap
+// (or the old model) showed the previous carport after a publish
+const V = "?v=1793944741";
 const TOUCH = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
 const QS = new URLSearchParams(location.search);
 const STORE = {   // localStorage can throw (private mode, blocked site data)
   get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } },
 };
-const REDUCED_KEY = "dalaba_reduced_1793944523", TRYING_KEY = "dalaba_full_trying_1793944523";
+const REDUCED_KEY = "dalaba_reduced_1793944741", TRYING_KEY = "dalaba_full_trying_1793944741";
 if (QS.get("full") === "1") { STORE.set(REDUCED_KEY, null); STORE.set(TRYING_KEY, null); }
 if (TOUCH && STORE.get(TRYING_KEY)) { STORE.set(REDUCED_KEY, "1"); STORE.set(TRYING_KEY, null); }
 const PHONE = TOUCH && (QS.get("phone") === "1" ||
@@ -301,7 +305,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 // it replaces three's AgX sigmoid, so greys and contrast match the renders.
 // "lite": a phone that lost its 3-D context with the baked extras reloads
 // without them (the plain lighting that always fitted); ?lite=0 / ?lite=1
-const LITE_KEY = "dalaba_lite_1793944523";     // per build: a new publish tries the full version again
+const LITE_KEY = "dalaba_lite_1793944741";     // per build: a new publish tries the full version again
 const LITE_Q = new URLSearchParams(location.search).get("lite");
 if (LITE_Q === "0" || QS.get("full") === "1") STORE.set(LITE_KEY, null);
 const LITE = LITE_Q === "1" || (LITE_Q !== "0" && STORE.get(LITE_KEY) === "1");
@@ -393,7 +397,7 @@ const scene = new THREE.Scene();
 // as the reflections on the outside surfaces and glass
 let skyEnv = null, skyDome = null;
 if (LIGHT && LIGHT.sky) {
-  new THREE.TextureLoader().load("tex/" + (PHONE && LIGHT.sky_phone || LIGHT.sky), (t) => {
+  new THREE.TextureLoader().load("tex/" + (PHONE && LIGHT.sky_phone || LIGHT.sky) + V, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     const old = scene.background;
     if (PHONE) {
@@ -433,7 +437,7 @@ void main() {
     if (old && old.isTexture) old.dispose();
   });
   // reflections: Cycles 360 of the yard (falls back to the sky)
-  if (LIGHT.probe && !PHONE) new THREE.TextureLoader().load("tex/" + LIGHT.probe, (t) => {
+  if (LIGHT.probe && !PHONE) new THREE.TextureLoader().load("tex/" + LIGHT.probe + V, (t) => {
     t.mapping = THREE.EquirectangularReflectionMapping;
     t.colorSpace = THREE.SRGBColorSpace;
     setEnv(pmrem.fromEquirectangular(t).texture);
@@ -645,7 +649,7 @@ function updateMirrors(camPos, ev) {
     const want = dist < 9 && (!PHONE || i === 0);
     if (want && !s.tex && !s.loading) {
       s.loading = true;
-      new THREE.TextureLoader().load("tex/" + (PHONE ? s.file_phone : s.file), (t) => {
+      new THREE.TextureLoader().load("tex/" + (PHONE ? s.file_phone : s.file) + V, (t) => {
         // mipmapped: the walnut reads a blurred level (fixed: no seam)
         t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearMipmapLinearFilter;
         s.tex = t; s.loading = false;
@@ -1051,7 +1055,7 @@ function enterPano(p) {
     if (f !== p.file) { panoTex[f].dispose(); delete panoTex[f]; }
   }
   if (!panoTex[p.file]) {
-    panoTex[p.file] = new THREE.TextureLoader().load("pano/" + p.file, (t) => {
+    panoTex[p.file] = new THREE.TextureLoader().load("pano/" + p.file + V, (t) => {
       if (panoOn && panoOn.file === p.file) { panoSphere.material.color.set(0xffffff); }
     });
     panoTex[p.file].colorSpace = THREE.SRGBColorSpace;
@@ -1138,7 +1142,7 @@ function loadScript(src) {
 async function fetchGlb() {
   // the plain .glb (GitHub Pages serves it): no base64 strings to decode, so
   // a phone holds one copy of the model instead of four
-  const res = await fetch("dalaba_model.glb");
+  const res = await fetch("dalaba_model.glb" + V);
   if (!res.ok) throw new Error("no .glb");
   // content-length is the gzipped size on GitHub Pages: collect the chunks
   // and use it for the progress bar only
@@ -1169,7 +1173,7 @@ async function loadModel() {
   loadBar.style.width = "35%";
   // base64 GLB in parts (artifacts cap each file at 16 MB)
   for (let i = 0; i < 4; i++) {
-    await loadScript(`dalaba_model_${i}.js`);
+    await loadScript(`dalaba_model_${i}.js` + V);
     loadBar.style.width = `${35 + 40 * (i + 1) / 4}%`;
   }
   loadText.textContent = "Building the house…";
@@ -1206,7 +1210,7 @@ async function finishModel(gltf) {
     m.color.setRGB(t.mean[0], t.mean[1], t.mean[2], THREE.SRGBColorSpace);
     if (!texCache[t.file]) {
       texCache[t.file] = new Promise((ok) => texLoader.load(
-        "tex/" + t.file, (tex) => {
+        "tex/" + t.file + V, (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
           tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
           tex.flipY = false;
@@ -1223,7 +1227,7 @@ async function finishModel(gltf) {
     if (t.normal) {
       if (!texCache[t.normal]) {
         texCache[t.normal] = new Promise((ok) => texLoader.load(
-          "tex/" + t.normal, (tex) => {
+          "tex/" + t.normal + V, (tex) => {
             tex.colorSpace = THREE.NoColorSpace;
             tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
             tex.flipY = false;
@@ -1283,7 +1287,7 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
   }
   function lightmap(file) {
     if (!lmCache[file]) {
-      const t = texLoader.load("tex/" + file);
+      const t = texLoader.load("tex/" + file + V);
       t.colorSpace = THREE.SRGBColorSpace;
       t.flipY = false;
       t.channel = 1;
