@@ -248,10 +248,33 @@ try {
   document.getElementById("loadBar").parentElement.hidden = true;
   throw e;
 }
-// Phones get a lighter path: no post-processing chain (its full-screen
-// half-float buffers, 4x MSAA copies and AO targets ran iPhones out of GPU
-// memory), a smaller shadow map, lower pixel ratio, one 360 photo in memory.
-const PHONE = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
+// Phones get the computer version (post-processing, the yard probe, full
+// textures and room photos) unless it has crashed on that phone (owner,
+// 2026-11-05: "works great" on a Pixel 10).  PHONE below means the reduced
+// version: no post-processing chain (its full-screen half-float buffers, 4x
+// MSAA copies and AO targets once ran iPhones out of GPU memory), a smaller
+// shadow map, lower pixel ratio, one 360 photo in memory.  A phone drops to it
+// after a real crash only: a lost 3-D context (handler below), or a tab the
+// browser killed (iOS out of GPU memory: no event) - the "trying" mark is set
+// on every full load and cleared once it has rendered for a while or the page
+// is left normally, so a mark still there on the next load means it died.
+// ?full=1 / ?phone=1 force either version (?full=1 also clears the marks).
+const TOUCH = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
+const QS = new URLSearchParams(location.search);
+const STORE = {   // localStorage can throw (private mode, blocked site data)
+  get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } },
+};
+const REDUCED_KEY = "dalaba_reduced_1793935782", TRYING_KEY = "dalaba_full_trying_1793935782";
+if (QS.get("full") === "1") { STORE.set(REDUCED_KEY, null); STORE.set(TRYING_KEY, null); }
+if (TOUCH && STORE.get(TRYING_KEY)) { STORE.set(REDUCED_KEY, "1"); STORE.set(TRYING_KEY, null); }
+const PHONE = TOUCH && (QS.get("phone") === "1" ||
+  (QS.get("full") !== "1" && STORE.get(REDUCED_KEY) === "1"));
+const TRYING_FULL = TOUCH && !PHONE;
+if (TRYING_FULL) {
+  STORE.set(TRYING_KEY, String(Date.now()));
+  addEventListener("pagehide", () => STORE.set(TRYING_KEY, null));
+}
 
 // This PowerVR driver (Pixel 10: "PowerVR D-Series DXT-48-1536") crashes the
 // GPU process on the one-element sun-shadow sampler array three r170 declares.
@@ -260,8 +283,9 @@ const PHONE = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").ma
 const gl = renderer.getContext();
 const gpuInfo = gl.getExtension("WEBGL_debug_renderer_info");
 // (?pvr=1 forces the workaround anywhere, to check that every shader compiles)
-const POWERVR = (PHONE && gpuInfo && /PowerVR/i.test(gl.getParameter(gpuInfo.UNMASKED_RENDERER_WEBGL))) ||
-  new URLSearchParams(location.search).get("pvr") === "1";
+// (TOUCH, not PHONE: the full version runs on phones too)
+const POWERVR = (TOUCH && gpuInfo && /PowerVR/i.test(gl.getParameter(gpuInfo.UNMASKED_RENDERER_WEBGL))) ||
+  QS.get("pvr") === "1";
 if (POWERVR) for (const k of ["shadowmap_pars_fragment", "lights_fragment_begin", "shadowmask_pars_fragment"]) {
   THREE.ShaderChunk[k] = THREE.ShaderChunk[k]
     .replace("directionalShadowMap[ NUM_DIR_LIGHT_SHADOWS ]", "directionalShadowMap")
@@ -277,10 +301,10 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 // it replaces three's AgX sigmoid, so greys and contrast match the renders.
 // "lite": a phone that lost its 3-D context with the baked extras reloads
 // without them (the plain lighting that always fitted); ?lite=0 / ?lite=1
-const LITE_KEY = "dalaba_lite_1793933281";     // per build: a new publish tries the full version again
+const LITE_KEY = "dalaba_lite_1793935782";     // per build: a new publish tries the full version again
 const LITE_Q = new URLSearchParams(location.search).get("lite");
-if (LITE_Q === "0") localStorage.removeItem(LITE_KEY);
-const LITE = LITE_Q === "1" || (LITE_Q !== "0" && localStorage.getItem(LITE_KEY) === "1");
+if (LITE_Q === "0" || QS.get("full") === "1") STORE.set(LITE_KEY, null);
+const LITE = LITE_Q === "1" || (LITE_Q !== "0" && STORE.get(LITE_KEY) === "1");
 const LIGHT = LITE ? null : (SITE.light || null);
 if (LIGHT && LIGHT.look) {
   // display value -> the sigmoid's output (three then applies ^2.2 and the
@@ -324,9 +348,16 @@ stage.appendChild(renderer.domElement);
 // offer a reload instead of freezing on a blank screen
 renderer.domElement.addEventListener("webglcontextlost", (e) => {
   e.preventDefault();
+  // the computer version crashed on this phone: reload in the phone version
+  if (TRYING_FULL) {
+    STORE.set(REDUCED_KEY, "1");
+    STORE.set(TRYING_KEY, null);
+    location.reload();
+    return;
+  }
   // first time on a phone with the baked extras: reload once in lite mode
   if (PHONE && !LITE && SITE.light) {
-    localStorage.setItem(LITE_KEY, "1");
+    STORE.set(LITE_KEY, "1");
     location.reload();
     return;
   }
@@ -997,8 +1028,7 @@ let panoOn = null;
 const photoBtn = document.getElementById("photoBtn");
 // the pulse stops once this viewer has opened a 360 photo (remembered per
 // browser when storage is available)
-try { if (localStorage.getItem("dalaba_pano_used")) photoBtn.classList.remove("pulse"); }
-catch (e) { /* storage blocked: keep pulsing */ }
+if (STORE.get("dalaba_pano_used")) photoBtn.classList.remove("pulse");   // (storage blocked: keeps pulsing)
 const bakeBtn = document.getElementById("bakeBtn");
 function nearestPano(x = player.x, y = player.y, roof = player.level === "roof") {
   const r = roof ? "Roof" : roomAt(x, y);
@@ -1041,7 +1071,7 @@ function enterPano(p) {
 function leavePano() { panoOn = null; }
 photoBtn.addEventListener("click", () => {
   photoBtn.classList.remove("pulse");
-  try { localStorage.setItem("dalaba_pano_used", "1"); } catch (e) { /* ignore */ }
+  STORE.set("dalaba_pano_used", "1");
   if (mode === "pano") { setMode("walk"); return; }
   const p = nearestPano();
   if (p) enterPano(p);
@@ -1584,7 +1614,7 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
     new Promise((ok) => { const c = () => (t.image ? ok() : setTimeout(c, 100)); c(); }))]);
   if (SHOT) { window.DALABA_SCENE = scene; window.DALABA_CAMERA = camera; window.DALABA_THREE = THREE; }
   // ?test=1: handles for device tests (phone GPU checks)
-  if (new URLSearchParams(location.search).get("test") === "1") window.DALABA_TEST = { renderer, scene, sun, camera, POWERVR, THREE };
+  if (QS.get("test") === "1") window.DALABA_TEST = { renderer, scene, sun, camera, POWERVR, PHONE, TOUCH, TRYING_FULL, LITE, composer, THREE };
   // ?debug=class: baked = green, outdoor open-sky = blue, indoor fill = red
   // ?debug=light: textures off (white), to see the light alone
   const DEBUG = new URLSearchParams(location.search).get("debug");
@@ -1605,6 +1635,8 @@ ${TINT.map(([b, t]) => `  if ( all( greaterThan( q, vec3( ${b.slice(0, 3).map((v
     n.material = Array.isArray(n.material) ? ms : ms[0];
   });
   setTimeout(() => (window.DALABA_READY = true), 500);
+  // the full version has settled on this phone
+  if (TRYING_FULL) setTimeout(() => { if (!renderer.getContext().isContextLost()) STORE.set(TRYING_KEY, null); }, 8000);
 }
 loadModel().catch((err) => {
   loadText.textContent = `The model didn't load (${err.message}). Reload the page to try again.`;
