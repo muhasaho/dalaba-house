@@ -262,14 +262,14 @@ try {
 // every asset URL carries the build stamp: GitHub Pages' CDN and browsers
 // cache them for 10 minutes, and a new model with an old cached lightmap
 // (or the old model) showed the previous carport after a publish
-const V = "?v=1795025179";
+const V = "?v=1795296753";
 const TOUCH = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
 const QS = new URLSearchParams(location.search);
 const STORE = {   // localStorage can throw (private mode, blocked site data)
   get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } },
 };
-const REDUCED_KEY = "dalaba_reduced_1795025179", TRYING_KEY = "dalaba_full_trying_1795025179";
+const REDUCED_KEY = "dalaba_reduced_1795296753", TRYING_KEY = "dalaba_full_trying_1795296753";
 if (QS.get("full") === "1") { STORE.set(REDUCED_KEY, null); STORE.set(TRYING_KEY, null); }
 if (TOUCH && STORE.get(TRYING_KEY)) { STORE.set(REDUCED_KEY, "1"); STORE.set(TRYING_KEY, null); }
 const PHONE = TOUCH && (QS.get("phone") === "1" ||
@@ -305,7 +305,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 // it replaces three's AgX sigmoid, so greys and contrast match the renders.
 // "lite": a phone that lost its 3-D context with the baked extras reloads
 // without them (the plain lighting that always fitted); ?lite=0 / ?lite=1
-const LITE_KEY = "dalaba_lite_1795025179";     // per build: a new publish tries the full version again
+const LITE_KEY = "dalaba_lite_1795296753";     // per build: a new publish tries the full version again
 const LITE_Q = new URLSearchParams(location.search).get("lite");
 if (LITE_Q === "0" || QS.get("full") === "1") STORE.set(LITE_KEY, null);
 const LITE = LITE_Q === "1" || (LITE_Q !== "0" && STORE.get(LITE_KEY) === "1");
@@ -1001,7 +1001,7 @@ function setMode(m) {
     camera.fov = 45; camera.updateProjectionMatrix();
     orbit.update();
   } else {
-    camera.fov = 68; camera.updateProjectionMatrix();
+    camera.fov = 68; camera.near = 0.05; camera.updateProjectionMatrix();
   }
   lastRoom = "";
   applyBaked();
@@ -1733,6 +1733,11 @@ renderer.setAnimationLoop(() => {
     camera.rotation.set(player.pitch, player.yaw, 0);
   } else {
     orbit.update();
+    // overview: the near plane follows the distance out - at the walk's 5 cm
+    // the rugs (1 cm over the floor) and the panels' two glass faces
+    // flickered through what's under them from 20 m away
+    const near = Math.min(1.5, Math.max(0.05, 0.08 * camera.position.distanceTo(orbit.target)));
+    if (Math.abs(near - camera.near) > 0.01) { camera.near = near; camera.updateProjectionMatrix(); }
   }
   updateHud();
   if (skyDome) skyDome.position.copy(camera.position);
