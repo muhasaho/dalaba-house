@@ -262,14 +262,14 @@ try {
 // every asset URL carries the build stamp: GitHub Pages' CDN and browsers
 // cache them for 10 minutes, and a new model with an old cached lightmap
 // (or the old model) showed the previous carport after a publish
-const V = "?v=1795381097";
+const V = "?v=1795381413";
 const TOUCH = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
 const QS = new URLSearchParams(location.search);
 const STORE = {   // localStorage can throw (private mode, blocked site data)
   get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } },
 };
-const REDUCED_KEY = "dalaba_reduced_1795381097", TRYING_KEY = "dalaba_full_trying_1795381097";
+const REDUCED_KEY = "dalaba_reduced_1795381413", TRYING_KEY = "dalaba_full_trying_1795381413";
 if (QS.get("full") === "1") { STORE.set(REDUCED_KEY, null); STORE.set(TRYING_KEY, null); }
 if (TOUCH && STORE.get(TRYING_KEY)) { STORE.set(REDUCED_KEY, "1"); STORE.set(TRYING_KEY, null); }
 const PHONE = TOUCH && (QS.get("phone") === "1" ||
@@ -305,7 +305,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 // it replaces three's AgX sigmoid, so greys and contrast match the renders.
 // "lite": a phone that lost its 3-D context with the baked extras reloads
 // without them (the plain lighting that always fitted); ?lite=0 / ?lite=1
-const LITE_KEY = "dalaba_lite_1795381097";     // per build: a new publish tries the full version again
+const LITE_KEY = "dalaba_lite_1795381413";     // per build: a new publish tries the full version again
 const LITE_Q = new URLSearchParams(location.search).get("lite");
 if (LITE_Q === "0" || QS.get("full") === "1") STORE.set(LITE_KEY, null);
 const LITE = LITE_Q === "1" || (LITE_Q !== "0" && STORE.get(LITE_KEY) === "1");
@@ -681,7 +681,27 @@ const ambient = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambient);
 // baked export: the outside no longer uses this fill (lightmap / open sky), so
 // it is the rooms' light: warm like the renders' 3000 K lamps
-const INDOOR = { ev: 0, k: 0 };
+// eye adaptation; snap: jump straight to the target (first frames, a jump
+// to another place, a mode change) instead of easing - on a phone still
+// loading, the ease from the outside's exposure took seconds (dark start)
+const INDOOR = { ev: 0, k: 0, snap: true };
+const DALABA_READY_FLAG = () => window.DALABA_READY === true;
+function setPanesInside(inside) {
+  if (inside === panesInside) return;
+  panesInside = inside;
+  for (const m of frosted) m.envMapIntensity = m.userData.frost.env * (inside ? 1 : 0.15);
+  for (const m of panes) {
+    if (inside) {
+      m.userData.skyEnv = m.envMap;
+      m.envMap = scene.environment; m.envMapIntensity = PANE_IN.env;
+      m.opacity = PANE_IN.opacity;
+    } else if (m.userData.skyEnv) {
+      m.envMap = m.userData.skyEnv ?? m.envMap;
+      m.envMapIntensity = m.userData.pane.env; m.opacity = m.userData.pane.opacity;
+    }
+    m.needsUpdate = true;
+  }
+}
 if (LIGHT && LIGHT.indoor_fill) {
   // baked rooms: the fill only reaches what's left unbaked indoors (fittings,
   // fans, glass), at the rooms' own baked light level
@@ -988,6 +1008,7 @@ const joyRow = document.querySelector(".controls-row");
 function setMode(m) {
   if (mode === "pano" && m !== "pano") leavePano();
   mode = m;
+  INDOOR.snap = true;                      // no fade from the last place
   btnWalk.setAttribute("aria-pressed", m === "walk");
   btnOver.setAttribute("aria-pressed", m === "over");
   joyRow.hidden = m !== "walk";
@@ -1124,7 +1145,7 @@ for (const [label, from, to, level] of STOPS) {
     }
     player.x = from[0]; player.y = from[1]; lookAt(from, to);
     player.level = level || "ground"; player.z = floorAt(player.x, player.y);
-    setMode("walk");
+    setMode("walk");                       // (snaps the exposure too)
   });
   chips.appendChild(b);
 }
@@ -1695,25 +1716,12 @@ renderer.setAnimationLoop(() => {
       // the renders' exposure for this room (stops over the outside)
       const RE = LIGHT.room_ev || { default: 0.9 };
       const target = inside ? (RE[r] ?? RE.default) : onRoof ? (LIGHT.roof_ev ?? 0) : 0;
-      INDOOR.ev += (target - INDOOR.ev) * (SHOT ? 1 : Math.min(1, dt * 2.5));
+      INDOOR.ev += (target - INDOOR.ev) * (SHOT || INDOOR.snap ? 1 : Math.min(1, dt * 2.5));
+      if (DALABA_READY_FLAG()) INDOOR.snap = false;
       renderer.toneMappingExposure = EXPOSURE * Math.pow(2, INDOOR.ev);
       updateMirrors(SHOT ? _mp.set(SHOT[0], SHOT[2], -SHOT[1]) : camera.position, INDOOR.ev);
       followShadow(px, py, inside);
-      if (inside !== panesInside) {
-        panesInside = inside;
-        for (const m of frosted) m.envMapIntensity = m.userData.frost.env * (inside ? 1 : 0.15);
-        for (const m of panes) {
-          if (inside) {
-            m.userData.skyEnv = m.envMap;
-            m.envMap = scene.environment; m.envMapIntensity = PANE_IN.env;
-            m.opacity = PANE_IN.opacity;
-          } else if (m.userData.skyEnv) {
-            m.envMap = m.userData.skyEnv ?? m.envMap;
-            m.envMapIntensity = m.userData.pane.env; m.opacity = m.userData.pane.opacity;
-          }
-          m.needsUpdate = true;
-        }
-      }
+      setPanesInside(inside);
     }
     if (SHOT) {
       camera.position.set(SHOT[0], SHOT[2], -SHOT[1]);
@@ -1734,6 +1742,15 @@ renderer.setAnimationLoop(() => {
     camera.rotation.set(player.pitch, player.yaw, 0);
   } else {
     orbit.update();
+    // overview (roof off, sunlit): the outside's exposure, panes and
+    // shadows, whatever room the walk was last in (it kept the room's +0.9
+    // EV and came out blown out when the walk started indoors)
+    if (LIGHT) {
+      INDOOR.ev = 0;
+      renderer.toneMappingExposure = EXPOSURE;
+      followShadow(player.x, player.y, false);
+      setPanesInside(false);
+    }
     // overview: the near plane follows the distance out - at the walk's 5 cm
     // the rugs (1 cm over the floor) and the panels' two glass faces
     // flickered through what's under them from 20 m away
